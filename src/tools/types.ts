@@ -2,18 +2,17 @@ import type * as z from 'zod';
 
 import type { Result } from '#root/src/result.js';
 import type { ToolDomainError } from '#root/src/errors.js';
-import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import {
   getReviewRoundInputSchema,
   getReviewRoundOutputSchema,
+  prStatusInputSchema,
+  prStatusOutputSchema,
   reviewActionsInputSchema,
   reviewActionsOutputSchema,
   reviewDecisionInputSchema,
   reviewDecisionOutputSchema,
   reviewEventInputSchema,
   reviewEventReceiptOutputSchema,
-  prStatusInputSchema,
-  prStatusOutputSchema,
   reviewStateInputSchema,
   reviewStateOutputSchema
 } from '#root/src/tools/schemas.js';
@@ -37,8 +36,12 @@ export type GetReviewRoundOutput = z.infer<typeof getReviewRoundOutputSchema>;
 export type PrStatusInput = z.input<typeof prStatusInputSchema>;
 export type PrStatusOutput = z.infer<typeof prStatusOutputSchema>;
 
-export interface ToolContract<TInputSchema extends z.ZodTypeAny, TOutputSchema extends z.ZodTypeAny> {
-  readonly name: string;
+export interface ToolContract<
+  TInputSchema extends z.ZodTypeAny,
+  TOutputSchema extends z.ZodTypeAny,
+  TName extends string = string
+> {
+  readonly name: TName;
   readonly title: string;
   readonly description: string;
   readonly actorScopes: readonly ActorScope[];
@@ -47,8 +50,7 @@ export interface ToolContract<TInputSchema extends z.ZodTypeAny, TOutputSchema e
   readonly inputSchema: TInputSchema;
   readonly outputSchema: TOutputSchema;
   readonly handler: (
-    input: z.output<TInputSchema>,
-    context: ToolExecutionContext
+    input: z.output<TInputSchema>
   ) => Promise<Result<z.output<TOutputSchema>, ToolDomainError>>;
 }
 
