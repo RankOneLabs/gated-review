@@ -26,8 +26,12 @@ export type ReviewEventReceiptOutput = z.infer<typeof reviewEventReceiptOutputSc
 export type ReviewDecisionInput = z.infer<typeof reviewDecisionInputSchema>;
 export type ReviewDecisionOutput = z.infer<typeof reviewDecisionOutputSchema>;
 
-export interface ToolContract<TInputSchema extends z.ZodTypeAny, TOutputSchema extends z.ZodTypeAny> {
-  readonly name: string;
+export interface ToolContract<
+  TInputSchema extends z.ZodTypeAny,
+  TOutputSchema extends z.ZodTypeAny,
+  TName extends string = string
+> {
+  readonly name: TName;
   readonly title: string;
   readonly description: string;
   readonly actorScopes: readonly ActorScope[];

@@ -24,6 +24,10 @@ function validateRefSegment(
     return err(createValidationError(operation, `${label} contains unsupported characters.`));
   }
 
+  if (value.startsWith('-')) {
+    return err(createValidationError(operation, `${label} must not start with a dash.`));
+  }
+
   if (
     value.startsWith('/') ||
     value.endsWith('/') ||
@@ -66,7 +70,12 @@ export function validateGitRefspec(
   const colonIndex = body.indexOf(':');
 
   if (colonIndex === -1) {
-    return validateRefSegment(body, operation, 'refspec');
+    const singleRef = validateRefSegment(body, operation, 'refspec');
+    if (!singleRef.ok) {
+      return singleRef;
+    }
+
+    return ok(`${leadingPlus}${singleRef.value}`);
   }
 
   if (body.indexOf(':', colonIndex + 1) !== -1) {

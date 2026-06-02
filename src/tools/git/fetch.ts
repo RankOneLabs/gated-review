@@ -45,7 +45,7 @@ async function runGitFetch(
 
 export function createGitFetchTool(
   dependenciesProvider: GitRunnerDependenciesProvider = getDefaultGitRunnerDependencies
-): ToolContract<typeof gitFetchInputSchema, typeof gitFetchOutputSchema> {
+): ToolContract<typeof gitFetchInputSchema, typeof gitFetchOutputSchema, 'git.fetch'> {
   return {
     name: 'git.fetch',
     title: 'Git Fetch',

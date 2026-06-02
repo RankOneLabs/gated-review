@@ -9,6 +9,32 @@ import {
   reviewEventReceiptOutputSchema,
   reviewStateInputSchema
 } from '#root/src/tools/schemas.js';
+import type { ToolContract } from '#root/src/tools/types.js';
+import type { ZodTypeAny } from 'zod';
+
+async function runStubHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
+  const input = tool.inputSchema.parse(
+    tool.name === 'review.record_event'
+      ? {
+          reviewId: 'review-123',
+          event: {
+            eventType: 'sync.completed',
+            payload: { status: 'done' }
+          }
+        }
+      : tool.name === 'review.apply_decision'
+        ? {
+            reviewId: 'review-123',
+            decision: 'approve',
+            reason: 'policy satisfied'
+          }
+        : {
+            reviewId: 'review-123'
+          }
+  );
+
+  return tool.handler(input);
+}
 
 describe('tool contracts', () => {
   it('exposes a narrow curated tool surface', () => {
@@ -98,32 +124,12 @@ describe('tool contracts', () => {
   });
 
   it('returns result values with domain errors for the review stub handlers', async () => {
-    const reviewTools = toolRegistry.filter((tool) => tool.name.startsWith('review.'));
-    const results = await Promise.all(
-      reviewTools.map(async (tool) => {
-        const input = tool.inputSchema.parse(
-          tool.name === 'review.record_event'
-            ? {
-                reviewId: 'review-123',
-                event: {
-                  eventType: 'sync.completed',
-                  payload: { status: 'done' }
-                }
-              }
-            : tool.name === 'review.apply_decision'
-              ? {
-                  reviewId: 'review-123',
-                  decision: 'approve',
-                  reason: 'policy satisfied'
-                }
-              : {
-                  reviewId: 'review-123'
-                }
-        );
-
-        return tool.handler(input);
-      })
-    );
+    const reviewTools = toolRegistry.filter((tool) => tool.name.startsWith('review.')) as readonly ToolContract<
+      ZodTypeAny,
+      ZodTypeAny,
+      string
+    >[];
+    const results = await Promise.all(reviewTools.map(async (tool) => runStubHandler(tool)));
 
     expect(results).toHaveLength(reviewTools.length);
     for (const result of results) {

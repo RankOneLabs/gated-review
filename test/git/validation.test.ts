@@ -10,6 +10,14 @@ describe('git validation helpers', () => {
       value: 'feature/remote-gateway'
     });
 
+    expect(validateGitBranchName('-refs/heads/main', 'git.push')).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        kind: 'validation_rejected',
+        operation: 'git.push'
+      })
+    });
+
     expect(validateGitBranchName(' feature/remote-gateway', 'git.push')).toEqual({
       ok: false,
       error: expect.objectContaining({
@@ -31,6 +39,11 @@ describe('git validation helpers', () => {
     expect(validateGitRefspec('refs/heads/main:refs/remotes/origin/main', 'git.fetch')).toEqual({
       ok: true,
       value: 'refs/heads/main:refs/remotes/origin/main'
+    });
+
+    expect(validateGitRefspec('+refs/heads/main', 'git.fetch')).toEqual({
+      ok: true,
+      value: '+refs/heads/main'
     });
 
     expect(validateGitRefspec('refs/heads/main:*', 'git.fetch')).toEqual({

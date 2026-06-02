@@ -46,7 +46,7 @@ async function runGitPush(
 
 export function createGitPushTool(
   dependenciesProvider: GitRunnerDependenciesProvider = getDefaultGitRunnerDependencies
-): ToolContract<typeof gitPushInputSchema, typeof gitPushOutputSchema> {
+): ToolContract<typeof gitPushInputSchema, typeof gitPushOutputSchema, 'git.push'> {
   return {
     name: 'git.push',
     title: 'Git Push',

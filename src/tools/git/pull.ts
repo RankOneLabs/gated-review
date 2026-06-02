@@ -47,7 +47,7 @@ async function runGitPull(
 
 export function createGitPullTool(
   dependenciesProvider: GitRunnerDependenciesProvider = getDefaultGitRunnerDependencies
-): ToolContract<typeof gitPullInputSchema, typeof gitPullOutputSchema> {
+): ToolContract<typeof gitPullInputSchema, typeof gitPullOutputSchema, 'git.pull'> {
   return {
     name: 'git.pull',
     title: 'Git Pull',

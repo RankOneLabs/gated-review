@@ -200,7 +200,7 @@ async function resolveCurrentBranch(
     ['-C', repoPath, 'branch', '--show-current']
   );
   if (!branchResult.ok) {
-    return branchResult;
+    return err(toValidationError('git.branch', branchResult.error.detail));
   }
 
   const branchName = trimStdout(branchResult.value.stdout);
@@ -228,7 +228,7 @@ async function resolveRemoteHost(
     ['-C', repoPath, 'remote', 'get-url', 'origin']
   );
   if (!remoteResult.ok) {
-    return remoteResult;
+    return err(toValidationError('git.remote', remoteResult.error.detail));
   }
 
   const remoteUrl = trimStdout(remoteResult.value.stdout);
