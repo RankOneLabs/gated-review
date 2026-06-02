@@ -106,3 +106,103 @@ export const reviewDecisionOutputSchema = z
   })
   .strict()
   .describe('review.apply_decision.output');
+
+export const readModelEntityKindSchema = z.enum(['coderabbit', 'copilot', 'human']);
+
+export const readModelEntitySchema = z
+  .object({
+    login: z.string().min(1),
+    kind: readModelEntityKindSchema
+  })
+  .strict();
+
+export const readModelThreadStateSchema = z.enum(['open', 'resolved']);
+
+export const readModelThreadCommentSchema = z
+  .object({
+    id: z.string().min(1),
+    body: z.string(),
+    createdAt: z.string().datetime(),
+    author: readModelEntitySchema
+  })
+  .strict();
+
+export const readModelReviewThreadSchema = z
+  .object({
+    id: z.string().min(1),
+    state: readModelThreadStateSchema,
+    path: z.string().min(1).nullable(),
+    line: z.number().int().nullable(),
+    comments: z.array(readModelThreadCommentSchema)
+  })
+  .strict();
+
+export const readModelSummaryCommentSchema = z
+  .object({
+    id: z.string().min(1),
+    body: z.string(),
+    createdAt: z.string().datetime(),
+    author: readModelEntitySchema
+  })
+  .strict();
+
+export const readModelChecksContextSchema = z
+  .object({
+    context: z.string().min(1),
+    state: z.enum(['success', 'failure', 'error', 'pending'])
+  })
+  .strict();
+
+export const readModelChecksSummarySchema = z
+  .object({
+    state: z.enum(['passing', 'failing', 'pending']),
+    totalCount: z.number().int().nonnegative(),
+    failingCount: z.number().int().nonnegative(),
+    pendingCount: z.number().int().nonnegative(),
+    contexts: z.array(readModelChecksContextSchema)
+  })
+  .strict();
+
+export const mergeReadyStateSchema = z
+  .object({
+    isReady: z.boolean(),
+    source: z.literal('github_label'),
+    label: z.literal('merge-ready')
+  })
+  .strict();
+
+export const getReviewRoundInputSchema = z
+  .object({
+    pullRequestNumber: z.number().int().positive(),
+    includeResolved: z.boolean().optional()
+  })
+  .strict()
+  .describe('get_review_round.input');
+
+export const getReviewRoundOutputSchema = z
+  .object({
+    pullRequestNumber: z.number().int().positive(),
+    includeResolved: z.boolean(),
+    openThreadCount: z.number().int().nonnegative(),
+    threads: z.array(readModelReviewThreadSchema),
+    summaries: z.array(readModelSummaryCommentSchema)
+  })
+  .strict()
+  .describe('get_review_round.output');
+
+export const prStatusInputSchema = z
+  .object({
+    pullRequestNumber: z.number().int().positive()
+  })
+  .strict()
+  .describe('pr_status.input');
+
+export const prStatusOutputSchema = z
+  .object({
+    pullRequestNumber: z.number().int().positive(),
+    openThreadCount: z.number().int().nonnegative(),
+    mergeReady: mergeReadyStateSchema,
+    checks: readModelChecksSummarySchema
+  })
+  .strict()
+  .describe('pr_status.output');

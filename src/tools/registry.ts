@@ -1,6 +1,16 @@
+import type * as z from 'zod';
+
 import { err } from '#root/src/result.js';
 import { notImplementedError } from '#root/src/errors.js';
+import { gitFetchTool } from '#root/src/tools/git/fetch.js';
+import { gitPullTool } from '#root/src/tools/git/pull.js';
+import { gitPushTool } from '#root/src/tools/git/push.js';
+import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import {
+  getReviewRoundInputSchema,
+  getReviewRoundOutputSchema,
+  prStatusInputSchema,
+  prStatusOutputSchema,
   reviewActionsInputSchema,
   reviewActionsOutputSchema,
   reviewDecisionInputSchema,
@@ -10,7 +20,6 @@ import {
   reviewStateInputSchema,
   reviewStateOutputSchema
 } from '#root/src/tools/schemas.js';
-import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import {
   createOpenPrHandler,
   openPrInputSchema,
@@ -31,11 +40,9 @@ import {
   requestNextRoundInputSchema,
   requestNextRoundOutputSchema
 } from '#root/src/tools/mutations/request-next-round.js';
-import { gitFetchTool } from '#root/src/tools/git/fetch.js';
-import { gitPullTool } from '#root/src/tools/git/pull.js';
-import { gitPushTool } from '#root/src/tools/git/push.js';
 import type { ToolContract } from '#root/src/tools/types.js';
-import type { ZodTypeAny } from 'zod';
+import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
+import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
 
 const notImplemented = (toolName: string) => async (_input: unknown) => {
   return err(notImplementedError(toolName));
@@ -140,7 +147,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'git.push.output',
       inputSchema: gitPushTool.inputSchema,
       outputSchema: gitPushTool.outputSchema,
-      handler: gitPushTool.handler
+      handler: (input) => gitPushTool.handler(input as Parameters<typeof gitPushTool.handler>[0])
     },
     {
       name: 'git.pull',
@@ -151,7 +158,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'git.pull.output',
       inputSchema: gitPullTool.inputSchema,
       outputSchema: gitPullTool.outputSchema,
-      handler: gitPullTool.handler
+      handler: (input) => gitPullTool.handler(input as Parameters<typeof gitPullTool.handler>[0])
     },
     {
       name: 'git.fetch',
@@ -162,9 +169,31 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'git.fetch.output',
       inputSchema: gitFetchTool.inputSchema,
       outputSchema: gitFetchTool.outputSchema,
-      handler: gitFetchTool.handler
+      handler: (input) => gitFetchTool.handler(input as Parameters<typeof gitFetchTool.handler>[0])
+    },
+    {
+      name: 'get_review_round',
+      title: 'Review Round',
+      description: 'Read the current review round for a pull request.',
+      actorScopes: ['agent', 'event_source'] as const,
+      inputSchemaName: 'get_review_round.input',
+      outputSchemaName: 'get_review_round.output',
+      inputSchema: getReviewRoundInputSchema,
+      outputSchema: getReviewRoundOutputSchema,
+      handler: (input) => getReviewRound(input, context)
+    },
+    {
+      name: 'pr_status',
+      title: 'PR Status',
+      description: 'Read advisory status for a pull request.',
+      actorScopes: ['agent', 'operator', 'event_source'] as const,
+      inputSchemaName: 'pr_status.input',
+      outputSchemaName: 'pr_status.output',
+      inputSchema: prStatusInputSchema,
+      outputSchema: prStatusOutputSchema,
+      handler: (input) => getPrStatus(input, context)
     }
-  ] as const satisfies readonly ToolContract<ZodTypeAny, ZodTypeAny, string>[];
+  ] as const satisfies readonly ToolContract<z.ZodTypeAny, z.ZodTypeAny, string>[];
 }
 
 export type ToolName = ReturnType<typeof createToolRegistry>[number]['name'];

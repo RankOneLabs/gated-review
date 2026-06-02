@@ -6,7 +6,7 @@ import { loadGitHubAppConfig } from '#root/src/config.js';
 import { describeToolError, validationRejectedError } from '#root/src/errors.js';
 import { isOk } from '#root/src/result.js';
 import { createToolRegistry } from '#root/src/tools/registry.js';
-import { createToolExecutionContext } from '#root/src/tools/context.js';
+import { createToolExecutionContext, type ToolExecutionContext } from '#root/src/tools/context.js';
 import { resolveRepositoryScope } from '#root/src/tools/mutations/repository.js';
 import { reviewDecisionOutputSchema } from '#root/src/tools/schemas.js';
 import type { ZodTypeAny } from 'zod';
@@ -72,7 +72,7 @@ function createToolHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
   };
 }
 
-export function createServer(context: import('#root/src/tools/context.js').ToolExecutionContext) {
+export function createServer(context: ToolExecutionContext) {
   const server = new McpServer({
     name: 'gated-review',
     version: '0.1.0'

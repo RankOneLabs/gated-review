@@ -2,7 +2,11 @@ import type * as z from 'zod';
 
 import type { Result } from '#root/src/result.js';
 import type { ToolDomainError } from '#root/src/errors.js';
-import type {
+import {
+  getReviewRoundInputSchema,
+  getReviewRoundOutputSchema,
+  prStatusInputSchema,
+  prStatusOutputSchema,
   reviewActionsInputSchema,
   reviewActionsOutputSchema,
   reviewDecisionInputSchema,
@@ -26,6 +30,12 @@ export type ReviewEventReceiptOutput = z.infer<typeof reviewEventReceiptOutputSc
 export type ReviewDecisionInput = z.infer<typeof reviewDecisionInputSchema>;
 export type ReviewDecisionOutput = z.infer<typeof reviewDecisionOutputSchema>;
 
+export type GetReviewRoundInput = z.input<typeof getReviewRoundInputSchema>;
+export type GetReviewRoundOutput = z.infer<typeof getReviewRoundOutputSchema>;
+
+export type PrStatusInput = z.input<typeof prStatusInputSchema>;
+export type PrStatusOutput = z.infer<typeof prStatusOutputSchema>;
+
 export interface ToolContract<
   TInputSchema extends z.ZodTypeAny,
   TOutputSchema extends z.ZodTypeAny,
@@ -39,5 +49,13 @@ export interface ToolContract<
   readonly outputSchemaName: string;
   readonly inputSchema: TInputSchema;
   readonly outputSchema: TOutputSchema;
-  handler(input: z.output<TInputSchema>): Promise<Result<z.output<TOutputSchema>, ToolDomainError>>;
+  readonly handler: (
+    input: z.output<TInputSchema>
+  ) => Promise<Result<z.output<TOutputSchema>, ToolDomainError>>;
+}
+
+export function defineToolContract<TInputSchema extends z.ZodTypeAny, TOutputSchema extends z.ZodTypeAny>(
+  contract: ToolContract<TInputSchema, TOutputSchema>
+) {
+  return contract;
 }

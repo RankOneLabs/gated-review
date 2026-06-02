@@ -1,22 +1,34 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ReviewId } from '#root/src/domain.js';
 import { ok } from '#root/src/result.js';
+import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { actorScopes } from '#root/src/tools/actors.js';
 import { createToolRegistry } from '#root/src/tools/registry.js';
 import {
+  getReviewRoundInputSchema,
+  getReviewRoundOutputSchema,
+  prStatusInputSchema,
+  prStatusOutputSchema,
   reviewActionSchema,
   reviewDecisionInputSchema,
   reviewEventReceiptOutputSchema,
   reviewStateInputSchema
 } from '#root/src/tools/schemas.js';
+import {
+  prStatusLabelsQuery,
+  prStatusQuery,
+  reviewRoundSummariesQuery,
+  reviewRoundThreadsQuery,
+  reviewThreadCommentsQuery
+} from '#root/src/tools/read-model/graphql-queries.js';
 import { createGitHubGraphQLClient } from '#root/src/github/graphql.js';
 import { createGitHubRestClient } from '#root/src/github/rest.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { ToolContract } from '#root/src/tools/types.js';
 import type { ZodTypeAny } from 'zod';
 
-function createMockContext() {
+function createMockContext(): ToolExecutionContext {
   const tokenProvider: GitHubInstallationTokenProvider = {
     async getInstallationToken() {
       return ok('installation-token');
@@ -73,6 +85,16 @@ function createMockContext() {
       }
     }
   );
+  rest.getCommitCombinedStatus = vi.fn(async () =>
+    ok({
+      state: 'failure',
+      statuses: [
+        { context: 'lint', state: 'success' },
+        { context: 'tests', state: 'failure' },
+        { context: 'docs', state: 'pending' }
+      ]
+    })
+  );
   const graphql = createGitHubGraphQLClient(
     {
       graphqlUrl: 'https://api.github.com/graphql',
@@ -89,6 +111,163 @@ function createMockContext() {
                 addPullRequestReviewThreadReply: {
                   comment: {
                     id: 'comment-123'
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (request.query === reviewRoundThreadsQuery) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                repository: {
+                  pullRequest: {
+                    reviewThreads: {
+                      nodes: [
+                        {
+                          id: 'thread-open',
+                          isResolved: false,
+                          path: 'src/open.ts',
+                          line: 12
+                        }
+                      ],
+                      pageInfo: {
+                        hasNextPage: false,
+                        endCursor: null
+                      }
+                    }
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (request.query === reviewThreadCommentsQuery) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                node: {
+                  comments: {
+                    nodes: [
+                      {
+                        id: 'comment-1',
+                        body: 'please adjust',
+                        createdAt: '2026-06-02T12:00:00.000Z',
+                        author: {
+                          login: 'alice'
+                        }
+                      }
+                    ],
+                    pageInfo: {
+                      hasNextPage: false,
+                      endCursor: null
+                    }
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (request.query === reviewRoundSummariesQuery) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                repository: {
+                  pullRequest: {
+                    comments: {
+                      nodes: [
+                        {
+                          id: 'summary-1',
+                          body: 'review summary',
+                          createdAt: '2026-06-02T12:01:00.000Z',
+                          author: {
+                            login: 'coderabbitai[bot]'
+                          }
+                        }
+                      ],
+                      pageInfo: {
+                        hasNextPage: false,
+                        endCursor: null
+                      }
+                    }
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (request.query === prStatusQuery) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                repository: {
+                  pullRequest: {
+                    headRefOid: 'head-sha-123',
+                    reviewThreads: {
+                      nodes: [
+                        { isResolved: false },
+                        { isResolved: true }
+                      ],
+                      pageInfo: {
+                        hasNextPage: false,
+                        endCursor: null
+                      }
+                    }
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (request.query === prStatusLabelsQuery) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                repository: {
+                  pullRequest: {
+                    labels: {
+                      nodes: [{ name: 'merge-ready' }],
+                      pageInfo: {
+                        hasNextPage: false,
+                        endCursor: null
+                      }
+                    }
                   }
                 }
               }
@@ -172,9 +351,13 @@ async function runStubHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>
                 ? {
                     pullRequestNumber: 17
                   }
-                : {
-                    reviewId: 'review-123'
-                  }
+                : tool.name === 'get_review_round' || tool.name === 'pr_status'
+                  ? {
+                      pullRequestNumber: 42
+                    }
+                  : {
+                      reviewId: 'review-123'
+                    }
   );
 
   return {
@@ -184,7 +367,7 @@ async function runStubHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>
 }
 
 describe('tool contracts', () => {
-  it('exposes a narrow curated tool surface', () => {
+  it('exposes the curated tool surface', () => {
     expect(createToolRegistry(createMockContext()).map((tool) => tool.name)).toEqual([
       'review.get_state',
       'review.list_actions',
@@ -196,7 +379,9 @@ describe('tool contracts', () => {
       'request_next_round',
       'git.push',
       'git.pull',
-      'git.fetch'
+      'git.fetch',
+      'get_review_round',
+      'pr_status'
     ]);
     expect(createToolRegistry(createMockContext()).map((tool) => tool.name)).not.toContain('github_raw');
   });
@@ -238,6 +423,15 @@ describe('tool contracts', () => {
       'agent',
       'operator'
     ]);
+    expect(toolRegistry.find((tool) => tool.name === 'get_review_round')?.actorScopes).toEqual([
+      'agent',
+      'event_source'
+    ]);
+    expect(toolRegistry.find((tool) => tool.name === 'pr_status')?.actorScopes).toEqual([
+      'agent',
+      'operator',
+      'event_source'
+    ]);
   });
 
   it('keeps the shaped output schema names explicit', () => {
@@ -252,8 +446,124 @@ describe('tool contracts', () => {
       'request_next_round.output',
       'git.push.output',
       'git.pull.output',
-      'git.fetch.output'
+      'git.fetch.output',
+      'get_review_round.output',
+      'pr_status.output'
     ]);
+  });
+
+  it('accepts shaped payloads for the read-model tools', () => {
+    expect(getReviewRoundInputSchema.parse({ pullRequestNumber: 42 })).toEqual({
+      pullRequestNumber: 42
+    });
+    expect(
+      getReviewRoundOutputSchema.parse({
+        pullRequestNumber: 42,
+        includeResolved: false,
+        openThreadCount: 1,
+        threads: [
+          {
+            id: 'thread-1',
+            state: 'open',
+            path: 'src/open.ts',
+            line: 12,
+            comments: [
+              {
+                id: 'comment-1',
+                body: 'please adjust',
+                createdAt: '2026-06-02T12:00:00.000Z',
+                author: {
+                  login: 'alice',
+                  kind: 'human'
+                }
+              }
+            ]
+          }
+        ],
+        summaries: [
+          {
+            id: 'summary-1',
+            body: 'review summary',
+            createdAt: '2026-06-02T12:01:00.000Z',
+            author: {
+              login: 'coderabbitai[bot]',
+              kind: 'coderabbit'
+            }
+          }
+        ]
+      })
+    ).toEqual({
+      pullRequestNumber: 42,
+      includeResolved: false,
+      openThreadCount: 1,
+      threads: [
+        {
+          id: 'thread-1',
+          state: 'open',
+          path: 'src/open.ts',
+          line: 12,
+          comments: [
+            {
+              id: 'comment-1',
+              body: 'please adjust',
+              createdAt: '2026-06-02T12:00:00.000Z',
+              author: {
+                login: 'alice',
+                kind: 'human'
+              }
+            }
+          ]
+        }
+      ],
+      summaries: [
+        {
+          id: 'summary-1',
+          body: 'review summary',
+          createdAt: '2026-06-02T12:01:00.000Z',
+          author: {
+            login: 'coderabbitai[bot]',
+            kind: 'coderabbit'
+          }
+        }
+      ]
+    });
+
+    expect(prStatusInputSchema.parse({ pullRequestNumber: 42 })).toEqual({
+      pullRequestNumber: 42
+    });
+    expect(
+      prStatusOutputSchema.parse({
+        pullRequestNumber: 42,
+        openThreadCount: 1,
+        mergeReady: {
+          isReady: true,
+          source: 'github_label',
+          label: 'merge-ready'
+        },
+        checks: {
+          state: 'passing',
+          totalCount: 1,
+          failingCount: 0,
+          pendingCount: 0,
+          contexts: [{ context: 'lint', state: 'success' }]
+        }
+      })
+    ).toEqual({
+      pullRequestNumber: 42,
+      openThreadCount: 1,
+      mergeReady: {
+        isReady: true,
+        source: 'github_label',
+        label: 'merge-ready'
+      },
+      checks: {
+        state: 'passing',
+        totalCount: 1,
+        failingCount: 0,
+        pendingCount: 0,
+        contexts: [{ context: 'lint', state: 'success' }]
+      }
+    });
   });
 
   it('brands the domain ids in the schema output types', () => {
@@ -289,7 +599,7 @@ describe('tool contracts', () => {
     expect(decisionReviewId).toBe('review-123');
   });
 
-  it('returns result values with domain errors for the review stub handlers', async () => {
+  it('returns result values with domain errors for the non-git stub handlers', async () => {
     const toolRegistry = createToolRegistry(createMockContext());
     const stubTools = toolRegistry.filter((tool) => !tool.name.startsWith('git.')) as readonly ToolContract<
       ZodTypeAny,
@@ -316,8 +626,77 @@ describe('tool contracts', () => {
             state: 'open'
           }
         });
-      } else {
+      } else if (
+        tool.name === 'reply_to_thread' ||
+        tool.name === 'resolve_thread' ||
+        tool.name === 'request_next_round'
+      ) {
         expect(result).toEqual({ ok: true, value: { ok: true } });
+      } else if (tool.name === 'get_review_round') {
+        expect(result).toEqual({
+          ok: true,
+          value: {
+            pullRequestNumber: 42,
+            includeResolved: false,
+            openThreadCount: 1,
+            threads: [
+              {
+                id: 'thread-open',
+                state: 'open',
+                path: 'src/open.ts',
+                line: 12,
+                comments: [
+                  {
+                    id: 'comment-1',
+                    body: 'please adjust',
+                    createdAt: '2026-06-02T12:00:00.000Z',
+                    author: {
+                      login: 'alice',
+                      kind: 'human'
+                    }
+                  }
+                ]
+              }
+            ],
+            summaries: [
+              {
+                id: 'summary-1',
+                body: 'review summary',
+                createdAt: '2026-06-02T12:01:00.000Z',
+                author: {
+                  login: 'coderabbitai[bot]',
+                  kind: 'coderabbit'
+                }
+              }
+            ]
+          }
+        });
+      } else if (tool.name === 'pr_status') {
+        expect(result).toEqual({
+          ok: true,
+          value: {
+            pullRequestNumber: 42,
+            openThreadCount: 1,
+            mergeReady: {
+              isReady: true,
+              source: 'github_label',
+              label: 'merge-ready'
+            },
+            checks: {
+              state: 'failing',
+              totalCount: 3,
+              failingCount: 1,
+              pendingCount: 1,
+              contexts: [
+                { context: 'lint', state: 'success' },
+                { context: 'tests', state: 'failure' },
+                { context: 'docs', state: 'pending' }
+              ]
+            }
+          }
+        });
+      } else {
+        expect(result.ok).toBe(false);
       }
     }
   });
