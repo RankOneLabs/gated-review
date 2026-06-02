@@ -49,7 +49,7 @@ export interface ToolContract<TInputSchema extends z.ZodTypeAny, TOutputSchema e
   readonly handler: (
     input: z.output<TInputSchema>,
     context: ToolExecutionContext
-  ) => Promise<Result<unknown, ToolDomainError>>;
+  ) => Promise<Result<z.output<TOutputSchema>, ToolDomainError>>;
 }
 
 export function defineToolContract<TInputSchema extends z.ZodTypeAny, TOutputSchema extends z.ZodTypeAny>(

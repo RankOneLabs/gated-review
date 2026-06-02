@@ -3,117 +3,93 @@ import { describe, expect, it, vi } from 'vitest';
 import { ok } from '#root/src/result.js';
 import type { GitHubClient } from '#root/src/github/client.js';
 import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
-import { prStatusQuery } from '#root/src/tools/read-model/graphql-queries.js';
+import {
+  prStatusLabelsQuery,
+  prStatusQuery
+} from '#root/src/tools/read-model/graphql-queries.js';
 
 function createGitHubClientMock() {
-  let callIndex = 0;
+  let threadCallIndex = 0;
+  let labelCallIndex = 0;
   const request = vi.fn(async (requestInput: { query: string; variables?: Record<string, unknown> }) => {
-    if (requestInput.query !== prStatusQuery) {
-      throw new Error(`Unexpected query: ${requestInput.query}`);
-    }
+    if (requestInput.query === prStatusQuery) {
+      threadCallIndex += 1;
 
-    callIndex += 1;
-
-    if (callIndex === 1) {
-      return ok({
-        repository: {
-          pullRequest: {
-            headRefOid: 'head-sha-123',
-            reviewThreads: {
-              nodes: [
-                { isResolved: false },
-                { isResolved: true }
-              ],
-              pageInfo: {
-                hasNextPage: true,
-                endCursor: 'threads-page-2'
-              }
-            },
-            labels: {
-              nodes: [],
-              pageInfo: {
-                hasNextPage: false,
-                endCursor: null
+      if (threadCallIndex === 1) {
+        return ok({
+          repository: {
+            pullRequest: {
+              headRefOid: 'head-sha-123',
+              reviewThreads: {
+                nodes: [
+                  { isResolved: false },
+                  { isResolved: true }
+                ],
+                pageInfo: {
+                  hasNextPage: true,
+                  endCursor: 'threads-page-2'
+                }
               }
             }
           }
-        }
-      });
-    }
+        });
+      }
 
-    if (callIndex === 2) {
-      return ok({
-        repository: {
-          pullRequest: {
-            headRefOid: 'head-sha-123',
-            reviewThreads: {
-              nodes: [{ isResolved: false }],
-              pageInfo: {
-                hasNextPage: false,
-                endCursor: null
+      if (threadCallIndex === 2) {
+        return ok({
+          repository: {
+            pullRequest: {
+              headRefOid: 'head-sha-123',
+              reviewThreads: {
+                nodes: [{ isResolved: false }],
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null
+                }
               }
             },
-            labels: {
-              nodes: [],
-              pageInfo: {
-                hasNextPage: false,
-                endCursor: null
+          }
+        });
+      }
+    }
+
+    if (requestInput.query === prStatusLabelsQuery) {
+      labelCallIndex += 1;
+
+      if (labelCallIndex === 1) {
+        return ok({
+          repository: {
+            pullRequest: {
+              labels: {
+                nodes: [{ name: 'documentation' }],
+                pageInfo: {
+                  hasNextPage: true,
+                  endCursor: 'labels-page-2'
+                }
               }
             }
           }
-        }
-      });
-    }
+        });
+      }
 
-    if (callIndex === 3) {
-      return ok({
-        repository: {
-          pullRequest: {
-            headRefOid: 'head-sha-123',
-            reviewThreads: {
-              nodes: [],
-              pageInfo: {
-                hasNextPage: false,
-                endCursor: null
-              }
-            },
-            labels: {
-              nodes: [{ name: 'documentation' }],
-              pageInfo: {
-                hasNextPage: true,
-                endCursor: 'labels-page-2'
+      if (labelCallIndex === 2) {
+        return ok({
+          repository: {
+            pullRequest: {
+              labels: {
+                nodes: [{ name: 'merge-ready' }],
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null
+                }
               }
             }
           }
-        }
-      });
+        });
+      }
     }
 
-    if (callIndex === 4) {
-      return ok({
-        repository: {
-          pullRequest: {
-            headRefOid: 'head-sha-123',
-            reviewThreads: {
-              nodes: [],
-              pageInfo: {
-                hasNextPage: false,
-                endCursor: null
-              }
-            },
-            labels: {
-              nodes: [{ name: 'merge-ready' }],
-              pageInfo: {
-                hasNextPage: false,
-                endCursor: null
-              }
-            }
-          }
-        }
-      });
-    }
-
-    throw new Error('Unexpected pr status request');
+    throw new Error(`Unexpected pr status request: ${requestInput.query}`);
   });
 
   const rest = {

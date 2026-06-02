@@ -1,8 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-import { describeToolError, validationRejectedError } from '#root/src/errors.js';
-import { isOk } from '#root/src/result.js';
+import { describeToolError, validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
+import { isOk, type Result } from '#root/src/result.js';
 import { loadToolExecutionContext, type ToolExecutionContext } from '#root/src/tools/context.js';
 import { toolRegistry } from '#root/src/tools/registry.js';
 
@@ -36,7 +36,10 @@ export function createServer(context: ToolExecutionContext) {
           };
         }
 
-        const outcome = await tool.handler(parsedInput.data, context);
+        const outcome = (await tool.handler(parsedInput.data, context)) as Result<
+          unknown,
+          ToolDomainError
+        >;
         if (isOk(outcome)) {
           const parsedOutput = tool.outputSchema.safeParse(outcome.value);
           if (!parsedOutput.success) {

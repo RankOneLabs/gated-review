@@ -92,6 +92,13 @@ export type GraphQLPrStatusQueryData = Readonly<{
         nodes: ReadonlyArray<Readonly<{ isResolved: boolean }>>;
         pageInfo: GraphQLPageInfo;
       }>;
+    } | null>;
+  }> | null;
+}>;
+
+export type GraphQLPrStatusLabelsQueryData = Readonly<{
+  repository: Readonly<{
+    pullRequest: Readonly<{
       labels: GraphQLLabelConnection;
     } | null>;
   }> | null;
@@ -214,7 +221,7 @@ export const reviewThreadCommentsQuery = `
 `;
 
 export const prStatusQuery = `
-  query PrStatusQuery($owner: String!, $repo: String!, $number: Int!, $after: String, $labelsAfter: String) {
+  query PrStatusQuery($owner: String!, $repo: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
         headRefOid
@@ -227,7 +234,16 @@ export const prStatusQuery = `
             endCursor
           }
         }
-        labels(first: 100, after: $labelsAfter) {
+      }
+    }
+  }
+`;
+
+export const prStatusLabelsQuery = `
+  query PrStatusLabelsQuery($owner: String!, $repo: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        labels(first: 100, after: $after) {
           nodes {
             name
           }

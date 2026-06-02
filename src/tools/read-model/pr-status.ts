@@ -2,7 +2,12 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { githubRequestFailedError, type ToolDomainError } from '#root/src/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { summarizeChecks } from '#root/src/tools/read-model/checks.js';
-import { prStatusQuery, type GraphQLPrStatusQueryData } from '#root/src/tools/read-model/graphql-queries.js';
+import {
+  prStatusLabelsQuery,
+  prStatusQuery,
+  type GraphQLPrStatusLabelsQueryData,
+  type GraphQLPrStatusQueryData
+} from '#root/src/tools/read-model/graphql-queries.js';
 import type { PullRequestStatus } from '#root/src/tools/read-model/types.js';
 
 export type PrStatusInput = {
@@ -15,8 +20,7 @@ const graphqlRequestLabel = 'POST /graphql';
 async function requestPrStatusPage(
   context: ToolExecutionContext,
   pullRequestNumber: number,
-  after: string | null,
-  labelsAfter: string | null
+  after: string | null
 ): Promise<Result<GraphQLPrStatusQueryData, ToolDomainError>> {
   const response = await context.github.graphql.request<GraphQLPrStatusQueryData>({
     operationName,
@@ -26,8 +30,7 @@ async function requestPrStatusPage(
       owner: context.repository.owner,
       repo: context.repository.repo,
       number: pullRequestNumber,
-      after,
-      labelsAfter
+      after
     }
   });
 
@@ -47,7 +50,7 @@ async function loadOpenThreadCount(
   let openThreadCount = 0;
 
   while (true) {
-    const page = await requestPrStatusPage(context, pullRequestNumber, after, null);
+    const page = await requestPrStatusPage(context, pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -90,6 +93,30 @@ async function loadOpenThreadCount(
   });
 }
 
+async function requestMergeReadyPage(
+  context: ToolExecutionContext,
+  pullRequestNumber: number,
+  after: string | null
+): Promise<Result<GraphQLPrStatusLabelsQueryData, ToolDomainError>> {
+  const response = await context.github.graphql.request<GraphQLPrStatusLabelsQueryData>({
+    operationName,
+    requestLabel: graphqlRequestLabel,
+    query: prStatusLabelsQuery,
+    variables: {
+      owner: context.repository.owner,
+      repo: context.repository.repo,
+      number: pullRequestNumber,
+      after
+    }
+  });
+
+  if (!response.ok) {
+    return err(githubRequestFailedError(operationName, response.error.message));
+  }
+
+  return ok(response.value);
+}
+
 async function loadMergeReadyState(
   context: ToolExecutionContext,
   pullRequestNumber: number
@@ -97,7 +124,7 @@ async function loadMergeReadyState(
   let labelsAfter: string | null = null;
 
   while (true) {
-    const page = await requestPrStatusPage(context, pullRequestNumber, null, labelsAfter);
+    const page = await requestMergeReadyPage(context, pullRequestNumber, labelsAfter);
     if (!page.ok) {
       return page;
     }

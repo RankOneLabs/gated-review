@@ -88,6 +88,24 @@ async function requestReviewThreadsPage(
   return ok(response.value);
 }
 
+async function loadThreadCommentsBatch(
+  context: ToolExecutionContext,
+  threadIds: ReadonlyArray<string>
+): Promise<Result<ReadonlyArray<ReadModelThreadComment[]>, ToolDomainError>> {
+  const results = await Promise.all(threadIds.map((threadId) => loadThreadComments(context, threadId)));
+
+  const comments: Array<ReadModelThreadComment[]> = [];
+  for (const result of results) {
+    if (!result.ok) {
+      return result;
+    }
+
+    comments.push(result.value);
+  }
+
+  return ok(comments);
+}
+
 async function requestThreadCommentsPage(
   context: ToolExecutionContext,
   threadId: string,
@@ -225,7 +243,12 @@ export async function getReviewRound(
   input: GetReviewRoundInput,
   context: ToolExecutionContext
 ): Promise<Result<ReviewRound, ToolDomainError>> {
-  const threads: Array<ReadModelReviewThread> = [];
+  const threads: Array<{
+    id: string;
+    state: 'open' | 'resolved';
+    path: string | null;
+    line: number | null;
+  }> = [];
   let openThreadCount = 0;
   let after: string | null = null;
 
@@ -251,17 +274,11 @@ export async function getReviewRound(
         continue;
       }
 
-      const comments = await loadThreadComments(context, thread.id);
-      if (!comments.ok) {
-        return comments;
-      }
-
       threads.push({
         id: thread.id,
         state: thread.isResolved ? 'resolved' : 'open',
         path: thread.path,
         line: thread.line,
-        comments: comments.value
       });
     }
 
@@ -278,6 +295,14 @@ export async function getReviewRound(
     after = pullRequest.reviewThreads.pageInfo.endCursor;
   }
 
+  const comments = await loadThreadCommentsBatch(
+    context,
+    threads.map((thread) => thread.id)
+  );
+  if (!comments.ok) {
+    return comments;
+  }
+
   const summaries = await loadSummaryComments(context, input.pullRequestNumber);
   if (!summaries.ok) {
     return summaries;
@@ -287,7 +312,10 @@ export async function getReviewRound(
     pullRequestNumber: input.pullRequestNumber,
     includeResolved: input.includeResolved ?? false,
     openThreadCount,
-    threads,
+    threads: threads.map((thread, index) => ({
+      ...thread,
+      comments: comments.value[index]
+    })),
     summaries: summaries.value
   });
 }
