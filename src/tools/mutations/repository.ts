@@ -44,8 +44,8 @@ function parseRepositorySlug(value: string): Result<GitHubRepositoryScope, Repos
   }
 
   return ok({
-    owner: segments[0],
-    repo: segments[1]
+    owner: segments[0].trim(),
+    repo: segments[1].trim()
   });
 }
 
