@@ -123,11 +123,11 @@ describe('schema validation', () => {
         appliedAt: '2026-06-02T12:00:00.000Z'
       })
     ).toEqual({
-      reviewId: 'review-123',
-      decisionId: 'decision-1',
-      finalStatus: 'approved',
-      appliedAt: '2026-06-02T12:00:00.000Z'
-    });
+        reviewId: 'review-123',
+        decisionId: 'decision-1',
+        finalStatus: 'approved',
+        appliedAt: '2026-06-02T12:00:00.000Z'
+      });
     expect(() =>
       reviewActionsInputSchema.parse({
         reviewId: ''

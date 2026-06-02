@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const reviewStatusSchema = z
-  .enum(['queued', 'blocked', 'approved', 'changes_requested'])
+  .enum(['queued', 'blocked', 'approved', 'request_changes'])
   .describe('review.get_state.output.status');
 
 export const reviewDecisionSchema = z
@@ -19,11 +19,13 @@ export const reviewStateOutputSchema = z
   .object({
     reviewId: z.string().min(1),
     status: reviewStatusSchema,
-    gate: z.object({
-      name: z.string().min(1),
-      isOpen: z.boolean(),
-      actorScope: z.enum(['agent', 'operator', 'event_source'])
-    }),
+    gate: z
+      .object({
+        name: z.string().min(1),
+        isOpen: z.boolean(),
+        actorScope: z.enum(['agent', 'operator', 'event_source'])
+      })
+      .strict(),
     lastUpdatedAt: z.string().datetime()
   })
   .strict()

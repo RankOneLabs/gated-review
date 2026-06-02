@@ -41,8 +41,12 @@ describe('tool contracts', () => {
   });
 
   it('binds every v1 handler to an explicit not implemented error', async () => {
-    await expect(toolRegistry[0].handler({ reviewId: 'review-123' })).rejects.toBeInstanceOf(
-      NotImplementedToolError
+    await Promise.all(
+      toolRegistry.map(async (tool) => {
+        await expect(tool.handler({ reviewId: 'review-123' } as never)).rejects.toBeInstanceOf(
+          NotImplementedToolError
+        );
+      })
     );
   });
 });
