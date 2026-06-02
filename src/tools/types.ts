@@ -5,8 +5,14 @@ import type { ToolDomainError } from '#root/src/errors.js';
 import {
   getReviewRoundInputSchema,
   getReviewRoundOutputSchema,
+  markMergeReadyInputSchema,
+  markMergeReadyOutputSchema,
+  mergePrInputSchema,
+  mergePrOutputSchema,
   prStatusInputSchema,
   prStatusOutputSchema,
+  requestCopilotReviewInputSchema,
+  requestCopilotReviewOutputSchema,
   reviewActionsInputSchema,
   reviewActionsOutputSchema,
   reviewDecisionInputSchema,
@@ -29,6 +35,15 @@ export type ReviewEventReceiptOutput = z.infer<typeof reviewEventReceiptOutputSc
 
 export type ReviewDecisionInput = z.infer<typeof reviewDecisionInputSchema>;
 export type ReviewDecisionOutput = z.infer<typeof reviewDecisionOutputSchema>;
+
+export type RequestCopilotReviewInput = z.infer<typeof requestCopilotReviewInputSchema>;
+export type RequestCopilotReviewOutput = z.infer<typeof requestCopilotReviewOutputSchema>;
+
+export type MarkMergeReadyInput = z.infer<typeof markMergeReadyInputSchema>;
+export type MarkMergeReadyOutput = z.infer<typeof markMergeReadyOutputSchema>;
+
+export type MergePrInput = z.infer<typeof mergePrInputSchema>;
+export type MergePrOutput = z.infer<typeof mergePrOutputSchema>;
 
 export type GetReviewRoundInput = z.input<typeof getReviewRoundInputSchema>;
 export type GetReviewRoundOutput = z.infer<typeof getReviewRoundOutputSchema>;

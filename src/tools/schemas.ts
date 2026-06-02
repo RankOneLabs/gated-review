@@ -107,6 +107,58 @@ export const reviewDecisionOutputSchema = z
   .strict()
   .describe('review.apply_decision.output');
 
+export const requestCopilotReviewInputSchema = z
+  .object({
+    pullRequestNumber: z.number().int().positive()
+  })
+  .strict()
+  .describe('request_copilot_review.input');
+
+export const requestCopilotReviewOutputSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .strict()
+  .describe('request_copilot_review.output');
+
+export const markMergeReadyInputSchema = z
+  .object({
+    pullRequestNumber: z.number().int().positive(),
+    ready: z.boolean()
+  })
+  .strict()
+  .describe('mark_merge_ready.input');
+
+export const markMergeReadyOutputSchema = z
+  .object({
+    ok: z.literal(true)
+  })
+  .strict()
+  .describe('mark_merge_ready.output');
+
+export const mergePrMergeMethodSchema = z
+  .enum(['merge', 'squash', 'rebase'])
+  .describe('merge_pr.input.mergeMethod');
+
+export const mergePrInputSchema = z
+  .object({
+    pullRequestNumber: z.number().int().positive(),
+    mergeMethod: mergePrMergeMethodSchema,
+    commitTitle: z.string().min(1).optional(),
+    commitMessage: z.string().min(1).optional(),
+    sha: z.string().min(1).optional()
+  })
+  .strict()
+  .describe('merge_pr.input');
+
+export const mergePrOutputSchema = z
+  .object({
+    merged: z.boolean(),
+    sha: z.string().min(1)
+  })
+  .strict()
+  .describe('merge_pr.output');
+
 export const readModelEntityKindSchema = z.enum(['coderabbit', 'copilot', 'human']);
 
 export const readModelEntitySchema = z
