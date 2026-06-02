@@ -1,6 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { generateKeyPairSync } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
@@ -69,5 +70,51 @@ describe('GitHub app config loading', () => {
       expect(invalidUrl.error.kind).toBe('invalid_configuration');
       expect(invalidUrl.error.detail).toContain('GITHUB_API_BASE_URL');
     }
+  });
+
+  it('resolves installation-token requests against path-prefixed api bases', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const pem = privateKey.export({ format: 'pem', type: 'pkcs1' }).toString();
+    const requestedUrls: Array<string> = [];
+
+    const result = await loadGitHubAppConfig({
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_INSTALLATION_ID: '456',
+      GITHUB_APP_PRIVATE_KEY: pem,
+      GITHUB_API_BASE_URL: 'https://example.com/api/v3'
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const { createGitHubAppAuth } = await import('#root/src/auth/github-app.js');
+      const auth = createGitHubAppAuth(result.value, {
+        fetch: async (input) => {
+          requestedUrls.push(String(input));
+          return new Response(
+            JSON.stringify({
+              token: 'installation-token',
+              expires_at: '2026-06-02T20:00:00.000Z'
+            }),
+            {
+              status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        },
+        now: () => Date.parse('2026-06-02T19:00:00.000Z')
+      });
+
+      expect(auth.ok).toBe(true);
+      if (auth.ok) {
+        const token = await auth.value.mintInstallationToken(456);
+        expect(token.ok).toBe(true);
+      }
+    }
+
+    expect(requestedUrls).toEqual([
+      'https://example.com/api/v3/app/installations/456/access_tokens'
+    ]);
   });
 });

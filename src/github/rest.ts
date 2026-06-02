@@ -2,8 +2,14 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { createGitHubError, type GitHubError } from '#root/src/github/errors.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { GitHubFetch } from '#root/src/github/fetch.js';
+import { resolveGitHubUrl } from '#root/src/github/url.js';
 
 export type GitHubRestMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+
+export type GitHubRepositoryScope = Readonly<{
+  owner: string;
+  repo: string;
+}>;
 
 export type GitHubRestRequest<TResponse> = Readonly<{
   operationName: string;
@@ -65,7 +71,11 @@ export type GitHubMergeResponse = Readonly<{
 }>;
 
 function buildUrl(baseUrl: string, path: string) {
-  return new URL(path, baseUrl);
+  return resolveGitHubUrl(baseUrl, path);
+}
+
+function buildRepositoryPath(repository: GitHubRepositoryScope, suffix: string) {
+  return `/repos/${repository.owner}/${repository.repo}/${suffix}`;
 }
 
 async function readErrorMessage(response: Response) {
@@ -96,17 +106,29 @@ export function createGitHubRestClient(
       return err(token.error);
     }
 
-    const response = await fetchFn(buildUrl(options.baseUrl, input.path), {
-      method: input.method,
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token.value}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'gated-review',
-        'X-GitHub-Api-Version': '2022-11-28'
-      },
-      body: input.body === undefined ? undefined : JSON.stringify(input.body)
-    });
+    let response: Response;
+    try {
+      response = await fetchFn(buildUrl(options.baseUrl, input.path), {
+        method: input.method,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token.value}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'gated-review',
+          'X-GitHub-Api-Version': '2022-11-28'
+        },
+        body: input.body === undefined ? undefined : JSON.stringify(input.body)
+      });
+    } catch {
+      return err(
+        createGitHubError({
+          category: 'transport',
+          operation: input.operationName,
+          requestLabel: input.requestLabel,
+          message: 'GitHub REST request failed.'
+        })
+      );
+    }
 
     if (!response.ok) {
       return err(
@@ -143,12 +165,12 @@ export function createGitHubRestClient(
 
   return {
     request,
-    createPullRequest(input: GitHubPullRequestInput) {
+    createPullRequest(repository: GitHubRepositoryScope, input: GitHubPullRequestInput) {
       return request<GitHubPullRequestResponse>({
         operationName: 'create_pull_request',
-        requestLabel: 'POST /repos/{owner}/{repo}/pulls',
+        requestLabel: `POST ${buildRepositoryPath(repository, 'pulls')}`,
         method: 'POST',
-        path: '/repos/{owner}/{repo}/pulls',
+        path: buildRepositoryPath(repository, 'pulls'),
         body: {
           title: input.title,
           head: input.head,
@@ -161,49 +183,51 @@ export function createGitHubRestClient(
         }
       });
     },
-    createIssueComment(issueNumber: number, body: string) {
+    createIssueComment(repository: GitHubRepositoryScope, issueNumber: number, body: string) {
       return request<GitHubIssueCommentResponse>({
         operationName: 'create_issue_comment',
-        requestLabel: `POST /repos/{owner}/{repo}/issues/${issueNumber}/comments`,
+        requestLabel: `POST ${buildRepositoryPath(repository, `issues/${issueNumber}/comments`)}`,
         method: 'POST',
-        path: `/repos/{owner}/{repo}/issues/${issueNumber}/comments`,
+        path: buildRepositoryPath(repository, `issues/${issueNumber}/comments`),
         body: { body }
       });
     },
     requestPullRequestReviewers(
+      repository: GitHubRepositoryScope,
       pullRequestNumber: number,
       reviewers: ReadonlyArray<string> = [],
       teamReviewers: ReadonlyArray<string> = []
     ) {
       return request<GitHubRequestedReviewersResponse>({
         operationName: 'request_pull_request_reviewers',
-        requestLabel: `POST /repos/{owner}/{repo}/pulls/${pullRequestNumber}/requested_reviewers`,
+        requestLabel: `POST ${buildRepositoryPath(repository, `pulls/${pullRequestNumber}/requested_reviewers`)}`,
         method: 'POST',
-        path: `/repos/{owner}/{repo}/pulls/${pullRequestNumber}/requested_reviewers`,
+        path: buildRepositoryPath(repository, `pulls/${pullRequestNumber}/requested_reviewers`),
         body: {
           ...(reviewers.length === 0 ? {} : { reviewers }),
           ...(teamReviewers.length === 0 ? {} : { team_reviewers: teamReviewers })
         }
       });
     },
-    addIssueLabels(issueNumber: number, labels: ReadonlyArray<string>) {
+    addIssueLabels(repository: GitHubRepositoryScope, issueNumber: number, labels: ReadonlyArray<string>) {
       return request<GitHubLabelsResponse>({
         operationName: 'add_issue_labels',
-        requestLabel: `POST /repos/{owner}/{repo}/issues/${issueNumber}/labels`,
+        requestLabel: `POST ${buildRepositoryPath(repository, `issues/${issueNumber}/labels`)}`,
         method: 'POST',
-        path: `/repos/{owner}/{repo}/issues/${issueNumber}/labels`,
+        path: buildRepositoryPath(repository, `issues/${issueNumber}/labels`),
         body: { labels }
       });
     },
-    getCommitCombinedStatus(commitSha: string) {
+    getCommitCombinedStatus(repository: GitHubRepositoryScope, commitSha: string) {
       return request<GitHubCombinedStatusResponse>({
         operationName: 'get_commit_combined_status',
-        requestLabel: `GET /repos/{owner}/{repo}/commits/${commitSha}/status`,
+        requestLabel: `GET ${buildRepositoryPath(repository, `commits/${commitSha}/status`)}`,
         method: 'GET',
-        path: `/repos/{owner}/{repo}/commits/${commitSha}/status`
+        path: buildRepositoryPath(repository, `commits/${commitSha}/status`)
       });
     },
     mergePullRequest(
+      repository: GitHubRepositoryScope,
       pullRequestNumber: number,
       input: Readonly<{
         mergeMethod?: 'merge' | 'squash' | 'rebase';
@@ -214,9 +238,9 @@ export function createGitHubRestClient(
     ) {
       return request<GitHubMergeResponse>({
         operationName: 'merge_pull_request',
-        requestLabel: `PUT /repos/{owner}/{repo}/pulls/${pullRequestNumber}/merge`,
+        requestLabel: `PUT ${buildRepositoryPath(repository, `pulls/${pullRequestNumber}/merge`)}`,
         method: 'PUT',
-        path: `/repos/{owner}/{repo}/pulls/${pullRequestNumber}/merge`,
+        path: buildRepositoryPath(repository, `pulls/${pullRequestNumber}/merge`),
         body: {
           ...(input.mergeMethod === undefined ? {} : { merge_method: input.mergeMethod }),
           ...(input.commitTitle === undefined ? {} : { commit_title: input.commitTitle }),

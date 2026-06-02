@@ -2,6 +2,7 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { createGitHubError, type GitHubError } from '#root/src/github/errors.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { GitHubFetch } from '#root/src/github/fetch.js';
+import { resolveGitHubUrl } from '#root/src/github/url.js';
 
 export type GitHubGraphQLPrimitive = string | number | boolean | null;
 export type GitHubGraphQLValue = GitHubGraphQLPrimitive | ReadonlyArray<unknown> | Readonly<Record<string, unknown>>;
@@ -83,21 +84,33 @@ export function createGitHubGraphQLClient(
         return err(token.error);
       }
 
-      const response = await fetchFn(new URL('/graphql', options.baseUrl), {
-        method: 'POST',
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token.value}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'gated-review',
-          'X-GitHub-Api-Version': '2022-11-28'
-        },
-        body: JSON.stringify({
-          operationName: request.operationName,
-          query: request.query,
-          variables: request.variables ?? {}
-        })
-      });
+      let response: Response;
+      try {
+        response = await fetchFn(resolveGitHubUrl(options.baseUrl, 'graphql'), {
+          method: 'POST',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token.value}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'gated-review',
+            'X-GitHub-Api-Version': '2022-11-28'
+          },
+          body: JSON.stringify({
+            operationName: request.operationName,
+            query: request.query,
+            variables: request.variables ?? {}
+          })
+        });
+      } catch {
+        return err(
+          createGitHubError({
+            category: 'transport',
+            operation: request.operationName,
+            requestLabel: request.requestLabel,
+            message: 'GitHub GraphQL request failed.'
+          })
+        );
+      }
 
       if (!response.ok) {
         return err(

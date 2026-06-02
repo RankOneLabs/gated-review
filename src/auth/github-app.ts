@@ -4,6 +4,7 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { createGitHubError, type GitHubError } from '#root/src/github/errors.js';
 import type { GitHubAppConfig } from '#root/src/config.js';
 import type { GitHubFetch } from '#root/src/github/fetch.js';
+import { resolveGitHubUrl } from '#root/src/github/url.js';
 
 export type GitHubInstallationToken = {
   installationId: number;
@@ -134,7 +135,7 @@ export function createGitHubAppAuth(
     async mintInstallationToken(installationId: number) {
       const jwt = createJwt(privateKey, config.appId, now());
       const requestLabel = `POST /app/installations/${installationId}/access_tokens`;
-      const url = new URL(`/app/installations/${installationId}/access_tokens`, config.apiBaseUrl);
+      const url = resolveGitHubUrl(config.apiBaseUrl, `app/installations/${installationId}/access_tokens`);
 
       let response: Response;
       try {
@@ -150,13 +151,12 @@ export function createGitHubAppAuth(
           body: '{}'
         });
       } catch (error: unknown) {
-        const detail = error instanceof Error ? error.message : String(error);
         return err(
           createGitHubError({
             category: 'transport',
             operation: 'mint_installation_token',
             requestLabel,
-            message: `GitHub token request failed: ${detail}`
+            message: 'GitHub token request failed.'
           })
         );
       }
