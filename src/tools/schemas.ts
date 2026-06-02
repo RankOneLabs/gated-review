@@ -1,4 +1,13 @@
 import { z } from 'zod';
+import type { ActionId, DecisionId, EventId, ReviewId } from '#root/src/domain.js';
+
+export const reviewIdSchema = z.string().min(1).transform((value): ReviewId => value as ReviewId);
+export const actionIdSchema = z.string().min(1).transform((value): ActionId => value as ActionId);
+export const eventIdSchema = z.string().min(1).transform((value): EventId => value as EventId);
+export const decisionIdSchema = z
+  .string()
+  .min(1)
+  .transform((value): DecisionId => value as DecisionId);
 
 export const reviewStatusSchema = z
   .enum(['queued', 'blocked', 'approved', 'request_changes'])
@@ -10,14 +19,14 @@ export const reviewDecisionSchema = z
 
 export const reviewStateInputSchema = z
   .object({
-    reviewId: z.string().min(1)
+    reviewId: reviewIdSchema
   })
   .strict()
   .describe('review.get_state.input');
 
 export const reviewStateOutputSchema = z
   .object({
-    reviewId: z.string().min(1),
+    reviewId: reviewIdSchema,
     status: reviewStatusSchema,
     gate: z
       .object({
@@ -33,14 +42,14 @@ export const reviewStateOutputSchema = z
 
 export const reviewActionsInputSchema = z
   .object({
-    reviewId: z.string().min(1)
+    reviewId: reviewIdSchema
   })
   .strict()
   .describe('review.list_actions.input');
 
 export const reviewActionSchema = z
   .object({
-    actionId: z.string().min(1),
+    actionId: actionIdSchema,
     kind: z.string().min(1),
     actorScope: z.enum(['agent', 'operator', 'event_source']),
     createdAt: z.string().datetime()
@@ -49,7 +58,7 @@ export const reviewActionSchema = z
 
 export const reviewActionsOutputSchema = z
   .object({
-    reviewId: z.string().min(1),
+    reviewId: reviewIdSchema,
     actions: z.array(reviewActionSchema)
   })
   .strict()
@@ -57,7 +66,7 @@ export const reviewActionsOutputSchema = z
 
 export const reviewEventInputSchema = z
   .object({
-    reviewId: z.string().min(1),
+    reviewId: reviewIdSchema,
     event: z
       .object({
         eventType: z.string().min(1),
@@ -70,8 +79,8 @@ export const reviewEventInputSchema = z
 
 export const reviewEventReceiptOutputSchema = z
   .object({
-    reviewId: z.string().min(1),
-    eventId: z.string().min(1),
+    reviewId: reviewIdSchema,
+    eventId: eventIdSchema,
     accepted: z.boolean(),
     receivedAt: z.string().datetime()
   })
@@ -80,7 +89,7 @@ export const reviewEventReceiptOutputSchema = z
 
 export const reviewDecisionInputSchema = z
   .object({
-    reviewId: z.string().min(1),
+    reviewId: reviewIdSchema,
     decision: reviewDecisionSchema,
     reason: z.string().min(1).optional()
   })
@@ -89,8 +98,8 @@ export const reviewDecisionInputSchema = z
 
 export const reviewDecisionOutputSchema = z
   .object({
-    reviewId: z.string().min(1),
-    decisionId: z.string().min(1),
+    reviewId: reviewIdSchema,
+    decisionId: decisionIdSchema,
     finalStatus: reviewStatusSchema,
     appliedAt: z.string().datetime()
   })

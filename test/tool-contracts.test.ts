@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { NotImplementedToolError } from '../src/errors.js';
-import { actorScopes } from '../src/tools/actors.js';
-import { toolRegistry } from '../src/tools/registry.js';
+import type { ReviewId } from '#root/src/domain.js';
+import { actorScopes } from '#root/src/tools/actors.js';
+import { toolRegistry } from '#root/src/tools/registry.js';
+import {
+  reviewActionSchema,
+  reviewDecisionInputSchema,
+  reviewEventReceiptOutputSchema,
+  reviewStateInputSchema
+} from '#root/src/tools/schemas.js';
 
 describe('tool contracts', () => {
   it('exposes a narrow curated tool surface', () => {
@@ -40,13 +46,74 @@ describe('tool contracts', () => {
     ]);
   });
 
-  it('binds every v1 handler to an explicit not implemented error', async () => {
-    await Promise.all(
+  it('brands the domain ids in the schema output types', () => {
+    const state = reviewStateInputSchema.parse({ reviewId: 'review-123' });
+    const stateReviewId: ReviewId = state.reviewId;
+
+    const action = reviewActionSchema.parse({
+      actionId: 'action-123',
+      kind: 'comment',
+      actorScope: 'operator',
+      createdAt: '2026-06-02T12:00:00.000Z'
+    });
+    const actionId = action.actionId;
+
+    const event = reviewEventReceiptOutputSchema.parse({
+      reviewId: 'review-123',
+      eventId: 'event-123',
+      accepted: true,
+      receivedAt: '2026-06-02T12:00:00.000Z'
+    });
+    const eventId = event.eventId;
+
+    const decision = reviewDecisionInputSchema.parse({
+      reviewId: 'review-123',
+      decision: 'approve',
+      reason: 'looks good'
+    });
+    const decisionReviewId: ReviewId = decision.reviewId;
+
+    expect(stateReviewId).toBe('review-123');
+    expect(actionId).toBe('action-123');
+    expect(eventId).toBe('event-123');
+    expect(decisionReviewId).toBe('review-123');
+  });
+
+  it('returns result values with domain errors for every stub handler', async () => {
+    const results = await Promise.all(
       toolRegistry.map(async (tool) => {
-        await expect(tool.handler({ reviewId: 'review-123' } as never)).rejects.toBeInstanceOf(
-          NotImplementedToolError
+        const input = tool.inputSchema.parse(
+          tool.name === 'review.record_event'
+            ? {
+                reviewId: 'review-123',
+                event: {
+                  eventType: 'sync.completed',
+                  payload: { status: 'done' }
+                }
+              }
+            : tool.name === 'review.apply_decision'
+              ? {
+                  reviewId: 'review-123',
+                  decision: 'approve',
+                  reason: 'policy satisfied'
+                }
+              : {
+                  reviewId: 'review-123'
+                }
         );
+
+        return tool.handler(input);
       })
     );
+
+    expect(results).toHaveLength(toolRegistry.length);
+    for (const result of results) {
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('not_implemented');
+        expect(result.error.operation).toMatch(/^review\./);
+        expect(result.error.entity).toEqual({ kind: 'tool', name: result.error.operation });
+      }
+    }
   });
 });

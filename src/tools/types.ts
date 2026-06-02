@@ -1,5 +1,7 @@
 import type * as z from 'zod';
 
+import type { Result } from '#root/src/result.js';
+import type { ToolDomainError } from '#root/src/errors.js';
 import type {
   reviewActionsInputSchema,
   reviewActionsOutputSchema,
@@ -9,8 +11,8 @@ import type {
   reviewEventReceiptOutputSchema,
   reviewStateInputSchema,
   reviewStateOutputSchema
-} from './schemas.js';
-import type { ActorScope } from './actors.js';
+} from '#root/src/tools/schemas.js';
+import type { ActorScope } from '#root/src/tools/actors.js';
 
 export type ReviewStateInput = z.infer<typeof reviewStateInputSchema>;
 export type ReviewStateOutput = z.infer<typeof reviewStateOutputSchema>;
@@ -33,5 +35,7 @@ export interface ToolContract<TInputSchema extends z.ZodTypeAny, TOutputSchema e
   readonly outputSchemaName: string;
   readonly inputSchema: TInputSchema;
   readonly outputSchema: TOutputSchema;
-  readonly handler: (input: z.infer<TInputSchema>) => Promise<z.infer<TOutputSchema>>;
+  readonly handler: (
+    input: z.output<TInputSchema>
+  ) => Promise<Result<z.output<TOutputSchema>, ToolDomainError>>;
 }

@@ -4,6 +4,10 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
+    "baseUrl": ".",
+    "paths": {
+      "#root/*": ["./*"]
+    },
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,

@@ -1,4 +1,4 @@
-import { runStdioServer } from './server.js';
+import { runStdioServer } from '#root/src/server.js';
 
 await runStdioServer().catch((error: unknown) => {
   const message = error instanceof Error ? error.stack ?? error.message : String(error);

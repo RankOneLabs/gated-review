@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { ActionId, DecisionId, EventId, ReviewId } from '#root/src/domain.js';
 import {
   reviewActionsInputSchema,
   reviewActionsOutputSchema,
@@ -7,15 +8,17 @@ import {
   reviewDecisionOutputSchema,
   reviewEventInputSchema,
   reviewEventReceiptOutputSchema,
+  reviewIdSchema,
   reviewStateInputSchema,
   reviewStateOutputSchema
-} from '../src/tools/schemas.js';
+} from '#root/src/tools/schemas.js';
 
 describe('schema validation', () => {
   it('accepts valid review state requests and rejects malformed input', () => {
-    expect(reviewStateInputSchema.parse({ reviewId: 'review-123' })).toEqual({
-      reviewId: 'review-123'
-    });
+    const parsed = reviewStateInputSchema.parse({ reviewId: 'review-123' });
+    const reviewId: ReviewId = parsed.reviewId;
+
+    expect(reviewId).toBe('review-123');
     expect(() => reviewStateInputSchema.parse({ reviewId: '' })).toThrow();
   });
 
@@ -47,9 +50,10 @@ describe('schema validation', () => {
   });
 
   it('accepts shaped output payloads for every registered tool', () => {
+    const brandedReviewId: ReviewId = reviewIdSchema.parse('review-123');
     expect(
       reviewStateOutputSchema.parse({
-        reviewId: 'review-123',
+        reviewId: brandedReviewId,
         status: 'queued',
         gate: {
           name: 'triage',
@@ -70,10 +74,10 @@ describe('schema validation', () => {
     });
     expect(
       reviewActionsOutputSchema.parse({
-        reviewId: 'review-123',
+        reviewId: brandedReviewId,
         actions: [
           {
-            actionId: 'action-1',
+            actionId: 'action-1' as ActionId,
             kind: 'comment',
             actorScope: 'operator',
             createdAt: '2026-06-02T12:00:00.000Z'
@@ -93,8 +97,8 @@ describe('schema validation', () => {
     });
     expect(
       reviewEventReceiptOutputSchema.parse({
-        reviewId: 'review-123',
-        eventId: 'event-1',
+        reviewId: brandedReviewId,
+        eventId: 'event-1' as EventId,
         accepted: true,
         receivedAt: '2026-06-02T12:00:00.000Z'
       })
@@ -106,7 +110,7 @@ describe('schema validation', () => {
     });
     expect(
       reviewDecisionInputSchema.parse({
-        reviewId: 'review-123',
+        reviewId: brandedReviewId,
         decision: 'approve',
         reason: 'policy satisfied'
       })
@@ -117,8 +121,8 @@ describe('schema validation', () => {
     });
     expect(
       reviewDecisionOutputSchema.parse({
-        reviewId: 'review-123',
-        decisionId: 'decision-1',
+        reviewId: brandedReviewId,
+        decisionId: 'decision-1' as DecisionId,
         finalStatus: 'approved',
         appliedAt: '2026-06-02T12:00:00.000Z'
       })

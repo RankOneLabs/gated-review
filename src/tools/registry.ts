@@ -1,4 +1,5 @@
-import { NotImplementedToolError } from '../errors.js';
+import { err } from '#root/src/result.js';
+import { notImplementedError } from '#root/src/errors.js';
 import {
   reviewActionsInputSchema,
   reviewActionsOutputSchema,
@@ -8,11 +9,11 @@ import {
   reviewEventReceiptOutputSchema,
   reviewStateInputSchema,
   reviewStateOutputSchema
-} from './schemas.js';
-import type { ToolContract } from './types.js';
+} from '#root/src/tools/schemas.js';
+import type { ToolContract } from '#root/src/tools/types.js';
 
 const notImplemented = (toolName: string) => async (_input: unknown) => {
-  throw new NotImplementedToolError(toolName);
+  return err(notImplementedError(toolName));
 };
 
 export const toolRegistry = [

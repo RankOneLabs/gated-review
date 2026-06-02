@@ -1,18 +1,41 @@
-export class NotImplementedToolError extends Error {
-  readonly code = 'NOT_IMPLEMENTED';
-  readonly toolName: string;
+import type { ToolEntity } from '#root/src/domain.js';
 
-  constructor(toolName: string) {
-    super(`Tool "${toolName}" is not implemented yet.`);
-    this.name = 'NotImplementedToolError';
-    this.toolName = toolName;
-  }
+export type ToolDomainError =
+  | {
+      kind: 'not_implemented';
+      operation: string;
+      entity: ToolEntity;
+      detail: string;
+    }
+  | {
+      kind: 'validation_rejected';
+      operation: string;
+      entity: ToolEntity;
+      detail: string;
+    };
+
+export function toolEntity(name: string): ToolEntity {
+  return { kind: 'tool', name };
 }
 
-export function toToolErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
+export function notImplementedError(operation: string, detail = 'Tool is not implemented yet.'): ToolDomainError {
+  return {
+    kind: 'not_implemented',
+    operation,
+    entity: toolEntity(operation),
+    detail
+  };
+}
 
-  return 'Unknown tool error.';
+export function validationRejectedError(operation: string, detail: string): ToolDomainError {
+  return {
+    kind: 'validation_rejected',
+    operation,
+    entity: toolEntity(operation),
+    detail
+  };
+}
+
+export function describeToolError(error: ToolDomainError): string {
+  return `${error.kind}: ${error.operation} :: ${error.detail}`;
 }
