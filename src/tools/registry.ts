@@ -10,13 +10,17 @@ import {
   reviewStateInputSchema,
   reviewStateOutputSchema
 } from '#root/src/tools/schemas.js';
+import { gitFetchTool } from '#root/src/tools/git/fetch.js';
+import { gitPullTool } from '#root/src/tools/git/pull.js';
+import { gitPushTool } from '#root/src/tools/git/push.js';
 import type { ToolContract } from '#root/src/tools/types.js';
+import type { ZodTypeAny } from 'zod';
 
 const notImplemented = (toolName: string) => async (_input: unknown) => {
   return err(notImplementedError(toolName));
 };
 
-export const toolRegistry = [
+const reviewToolRegistry = [
   {
     name: 'review.get_state',
     title: 'Review State',
@@ -61,7 +65,14 @@ export const toolRegistry = [
     outputSchema: reviewDecisionOutputSchema,
     handler: notImplemented('review.apply_decision')
   }
-] as const satisfies readonly ToolContract<import('zod').ZodTypeAny, import('zod').ZodTypeAny>[];
+] as const satisfies readonly ToolContract<ZodTypeAny, ZodTypeAny>[];
+
+export const toolRegistry: readonly ToolContract<ZodTypeAny, ZodTypeAny>[] = [
+  ...reviewToolRegistry,
+  gitPushTool,
+  gitPullTool,
+  gitFetchTool
+];
 
 export type ToolName = (typeof toolRegistry)[number]['name'];
 

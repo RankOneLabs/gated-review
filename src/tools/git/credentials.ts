@@ -22,8 +22,9 @@ export function createGitHubExtraHeader(hostOrUrl: string, token: string) {
 
 export function redactGitHubExtraHeader(value: string, token: string) {
   const encodedToken = encodeBasicAuth(token);
-  return value
-    .replaceAll(token, '[redacted]')
+  const withTokenRedacted =
+    token === '' ? value : value.replaceAll(token, '[redacted]');
+  return withTokenRedacted
     .replaceAll(encodedToken, '[redacted]')
     .replace(/AUTHORIZATION: basic [A-Za-z0-9+/=]+/g, 'AUTHORIZATION: basic [redacted]');
 }

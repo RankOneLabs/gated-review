@@ -16,7 +16,10 @@ describe('tool contracts', () => {
       'review.get_state',
       'review.list_actions',
       'review.record_event',
-      'review.apply_decision'
+      'review.apply_decision',
+      'git.push',
+      'git.pull',
+      'git.fetch'
     ]);
     expect(toolRegistry.map((tool) => tool.name)).not.toContain('github_raw');
   });
@@ -35,6 +38,18 @@ describe('tool contracts', () => {
     expect(toolRegistry.find((tool) => tool.name === 'review.apply_decision')?.actorScopes).toEqual([
       'operator'
     ]);
+    expect(toolRegistry.find((tool) => tool.name === 'git.push')?.actorScopes).toEqual([
+      'agent',
+      'operator'
+    ]);
+    expect(toolRegistry.find((tool) => tool.name === 'git.pull')?.actorScopes).toEqual([
+      'agent',
+      'operator'
+    ]);
+    expect(toolRegistry.find((tool) => tool.name === 'git.fetch')?.actorScopes).toEqual([
+      'agent',
+      'operator'
+    ]);
   });
 
   it('keeps the shaped output schema names explicit', () => {
@@ -42,7 +57,10 @@ describe('tool contracts', () => {
       'review.get_state.output',
       'review.list_actions.output',
       'review.record_event.output',
-      'review.apply_decision.output'
+      'review.apply_decision.output',
+      'git.push.output',
+      'git.pull.output',
+      'git.fetch.output'
     ]);
   });
 
@@ -79,9 +97,10 @@ describe('tool contracts', () => {
     expect(decisionReviewId).toBe('review-123');
   });
 
-  it('returns result values with domain errors for every stub handler', async () => {
+  it('returns result values with domain errors for the review stub handlers', async () => {
+    const reviewTools = toolRegistry.filter((tool) => tool.name.startsWith('review.'));
     const results = await Promise.all(
-      toolRegistry.map(async (tool) => {
+      reviewTools.map(async (tool) => {
         const input = tool.inputSchema.parse(
           tool.name === 'review.record_event'
             ? {
@@ -106,7 +125,7 @@ describe('tool contracts', () => {
       })
     );
 
-    expect(results).toHaveLength(toolRegistry.length);
+    expect(results).toHaveLength(reviewTools.length);
     for (const result of results) {
       expect(result.ok).toBe(false);
       if (!result.ok) {
