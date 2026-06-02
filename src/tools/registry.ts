@@ -10,13 +10,35 @@ import {
   reviewStateInputSchema,
   reviewStateOutputSchema
 } from '#root/src/tools/schemas.js';
+import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import {
+  createOpenPrHandler,
+  openPrInputSchema,
+  openPrOutputSchema
+} from '#root/src/tools/mutations/open-pr.js';
+import {
+  createReplyToThreadHandler,
+  replyToThreadInputSchema,
+  replyToThreadOutputSchema
+} from '#root/src/tools/mutations/reply-to-thread.js';
+import {
+  createResolveThreadHandler,
+  resolveThreadInputSchema,
+  resolveThreadOutputSchema
+} from '#root/src/tools/mutations/resolve-thread.js';
+import {
+  createRequestNextRoundHandler,
+  requestNextRoundInputSchema,
+  requestNextRoundOutputSchema
+} from '#root/src/tools/mutations/request-next-round.js';
 import type { ToolContract } from '#root/src/tools/types.js';
 
 const notImplemented = (toolName: string) => async (_input: unknown) => {
   return err(notImplementedError(toolName));
 };
 
-export const toolRegistry = [
+export function createToolRegistry(context: ToolExecutionContext) {
+  return [
   {
     name: 'review.get_state',
     title: 'Review State',
@@ -60,11 +82,55 @@ export const toolRegistry = [
     inputSchema: reviewDecisionInputSchema,
     outputSchema: reviewDecisionOutputSchema,
     handler: notImplemented('review.apply_decision')
+  },
+  {
+    name: 'open_pr',
+    title: 'Open Pull Request',
+    description: 'Open a pull request in the configured repository scope.',
+    actorScopes: ['agent'] as const,
+    inputSchemaName: 'open_pr.input',
+    outputSchemaName: 'open_pr.output',
+    inputSchema: openPrInputSchema,
+    outputSchema: openPrOutputSchema,
+    handler: createOpenPrHandler(context)
+  },
+  {
+    name: 'reply_to_thread',
+    title: 'Reply To Thread',
+    description: 'Reply to a GitHub review thread.',
+    actorScopes: ['agent'] as const,
+    inputSchemaName: 'reply_to_thread.input',
+    outputSchemaName: 'reply_to_thread.output',
+    inputSchema: replyToThreadInputSchema,
+    outputSchema: replyToThreadOutputSchema,
+    handler: createReplyToThreadHandler(context)
+  },
+  {
+    name: 'resolve_thread',
+    title: 'Resolve Thread',
+    description: 'Resolve a GitHub review thread.',
+    actorScopes: ['agent'] as const,
+    inputSchemaName: 'resolve_thread.input',
+    outputSchemaName: 'resolve_thread.output',
+    inputSchema: resolveThreadInputSchema,
+    outputSchema: resolveThreadOutputSchema,
+    handler: createResolveThreadHandler(context)
+  },
+  {
+    name: 'request_next_round',
+    title: 'Request Next Round',
+    description: 'Request another CodeRabbit review round on a pull request.',
+    actorScopes: ['agent'] as const,
+    inputSchemaName: 'request_next_round.input',
+    outputSchemaName: 'request_next_round.output',
+    inputSchema: requestNextRoundInputSchema,
+    outputSchema: requestNextRoundOutputSchema,
+    handler: createRequestNextRoundHandler(context)
   }
 ] as const satisfies readonly ToolContract<import('zod').ZodTypeAny, import('zod').ZodTypeAny>[];
+}
+export type ToolName = ReturnType<typeof createToolRegistry>[number]['name'];
 
-export type ToolName = (typeof toolRegistry)[number]['name'];
-
-export function getToolContract(name: ToolName) {
-  return toolRegistry.find((tool) => tool.name === name);
+export function getToolContract(name: ToolName, context: ToolExecutionContext) {
+  return createToolRegistry(context).find((tool) => tool.name === name);
 }
