@@ -15,14 +15,14 @@ export const replyToThreadInputSchema = z
     body: z.string().min(1)
   })
   .strict()
-  .describe('github.reply_to_thread.input');
+  .describe('reply_to_thread.input');
 
 export const replyToThreadOutputSchema = z
   .object({
     ok: z.literal(true)
   })
   .strict()
-  .describe('github.reply_to_thread.output');
+  .describe('reply_to_thread.output');
 
 export type ReplyToThreadInput = z.infer<typeof replyToThreadInputSchema>;
 export type ReplyToThreadOutput = z.infer<typeof replyToThreadOutputSchema>;
@@ -34,11 +34,12 @@ function mapGitHubError(operation: string, error: GitHubError): ToolDomainError 
 
 export function createReplyToThreadHandler(context: ToolExecutionContext) {
   return async function replyToThread(
-    input: ReplyToThreadInput
+    input: unknown
   ): Promise<Result<ReplyToThreadOutput, ToolDomainError>> {
+    const parsedInput = replyToThreadInputSchema.parse(input);
     const result = await addPullRequestReviewThreadReply(context.github.graphql, {
-      threadId: input.threadId,
-      body: input.body
+      threadId: parsedInput.threadId,
+      body: parsedInput.body
     } satisfies AddPullRequestReviewThreadReplyInput);
 
     if (!result.ok) {

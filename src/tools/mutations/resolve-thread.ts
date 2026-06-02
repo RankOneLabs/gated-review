@@ -11,14 +11,14 @@ export const resolveThreadInputSchema = z
     threadId: z.string().min(1)
   })
   .strict()
-  .describe('github.resolve_thread.input');
+  .describe('resolve_thread.input');
 
 export const resolveThreadOutputSchema = z
   .object({
     ok: z.literal(true)
   })
   .strict()
-  .describe('github.resolve_thread.output');
+  .describe('resolve_thread.output');
 
 export type ResolveThreadInput = z.infer<typeof resolveThreadInputSchema>;
 export type ResolveThreadOutput = z.infer<typeof resolveThreadOutputSchema>;
@@ -30,10 +30,11 @@ function mapGitHubError(operation: string, error: GitHubError): ToolDomainError 
 
 export function createResolveThreadHandler(context: ToolExecutionContext) {
   return async function resolveThread(
-    input: ResolveThreadInput
+    input: unknown
   ): Promise<Result<ResolveThreadOutput, ToolDomainError>> {
+    const parsedInput = resolveThreadInputSchema.parse(input);
     const result = await resolveReviewThread(context.github.graphql, {
-      threadId: input.threadId
+      threadId: parsedInput.threadId
     });
 
     if (!result.ok) {

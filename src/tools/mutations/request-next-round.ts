@@ -10,14 +10,14 @@ export const requestNextRoundInputSchema = z
     pullRequestNumber: z.number().int().positive()
   })
   .strict()
-  .describe('github.request_next_round.input');
+  .describe('request_next_round.input');
 
 export const requestNextRoundOutputSchema = z
   .object({
     ok: z.literal(true)
   })
   .strict()
-  .describe('github.request_next_round.output');
+  .describe('request_next_round.output');
 
 export type RequestNextRoundInput = z.infer<typeof requestNextRoundInputSchema>;
 export type RequestNextRoundOutput = z.infer<typeof requestNextRoundOutputSchema>;
@@ -29,11 +29,12 @@ function mapGitHubError(operation: string, error: GitHubError): ToolDomainError 
 
 export function createRequestNextRoundHandler(context: ToolExecutionContext) {
   return async function requestNextRound(
-    input: RequestNextRoundInput
+    input: unknown
   ): Promise<Result<RequestNextRoundOutput, ToolDomainError>> {
+    const parsedInput = requestNextRoundInputSchema.parse(input);
     const result = await context.github.rest.createIssueComment(
       context.repository,
-      input.pullRequestNumber,
+      parsedInput.pullRequestNumber,
       '@coderabbitai review'
     );
 

@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 import { githubError, type ToolDomainError } from '#root/src/errors.js';
 import type { GitHubError } from '#root/src/github/errors.js';
-import type { GitHubRepositoryScope } from '#root/src/github/rest.js';
 import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import { resolveRepositoryScopeFromContext } from '#root/src/tools/mutations/repository.js';
 
 export const openPrInputSchema = z
   .object({
@@ -15,7 +15,7 @@ export const openPrInputSchema = z
     draft: z.boolean().optional()
   })
   .strict()
-  .describe('github.open_pr.input');
+  .describe('open_pr.input');
 
 export const openPrOutputSchema = z
   .object({
@@ -24,7 +24,7 @@ export const openPrOutputSchema = z
     state: z.string().min(1)
   })
   .strict()
-  .describe('github.open_pr.output');
+  .describe('open_pr.output');
 
 export type OpenPrInput = z.infer<typeof openPrInputSchema>;
 export type OpenPrOutput = z.infer<typeof openPrOutputSchema>;
@@ -34,19 +34,19 @@ function mapGitHubError(operation: string, error: GitHubError): ToolDomainError 
   return githubError(operation, `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`);
 }
 
-function resolveRepository(context: ToolExecutionContext): GitHubRepositoryScope {
-  return context.repository;
-}
-
 export function createOpenPrHandler(context: ToolExecutionContext) {
-  return async function openPr(input: OpenPrInput): Promise<Result<OpenPrOutput, ToolDomainError>> {
-    const result = await context.github.rest.createPullRequest(resolveRepository(context), {
-      title: input.title,
-      head: input.head,
-      base: input.base,
-      ...(input.body === undefined ? {} : { body: input.body }),
-      ...(input.draft === undefined ? {} : { draft: input.draft })
-    });
+  return async function openPr(input: unknown): Promise<Result<OpenPrOutput, ToolDomainError>> {
+    const parsedInput = openPrInputSchema.parse(input);
+    const result = await context.github.rest.createPullRequest(
+      resolveRepositoryScopeFromContext(context),
+      {
+        title: parsedInput.title,
+        head: parsedInput.head,
+        base: parsedInput.base,
+        ...(parsedInput.body === undefined ? {} : { body: parsedInput.body }),
+        ...(parsedInput.draft === undefined ? {} : { draft: parsedInput.draft })
+      }
+    );
 
     if (!result.ok) {
       return err(mapGitHubError('open_pr', result.error));
