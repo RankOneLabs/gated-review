@@ -1,40 +1,169 @@
-import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
-import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
+import type * as z from 'zod';
+
+import { err } from '#root/src/result.js';
+import { notImplementedError } from '#root/src/errors.js';
+import type { GetReviewRoundInput } from '#root/src/tools/read-model/get-review-round.js';
+import type { PrStatusInput } from '#root/src/tools/read-model/pr-status.js';
 import {
   getReviewRoundInputSchema,
   getReviewRoundOutputSchema,
   prStatusInputSchema,
-  prStatusOutputSchema
+  prStatusOutputSchema,
+  reviewActionsInputSchema,
+  reviewActionsOutputSchema,
+  reviewDecisionInputSchema,
+  reviewDecisionOutputSchema,
+  reviewEventInputSchema,
+  reviewEventReceiptOutputSchema,
+  reviewStateInputSchema,
+  reviewStateOutputSchema
 } from '#root/src/tools/schemas.js';
-import { defineToolContract } from '#root/src/tools/types.js';
+import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
+import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
+import {
+  createOpenPrHandler,
+  openPrInputSchema,
+  openPrOutputSchema
+} from '#root/src/tools/mutations/open-pr.js';
+import {
+  createReplyToThreadHandler,
+  replyToThreadInputSchema,
+  replyToThreadOutputSchema
+} from '#root/src/tools/mutations/reply-to-thread.js';
+import {
+  createResolveThreadHandler,
+  resolveThreadInputSchema,
+  resolveThreadOutputSchema
+} from '#root/src/tools/mutations/resolve-thread.js';
+import {
+  createRequestNextRoundHandler,
+  requestNextRoundInputSchema,
+  requestNextRoundOutputSchema
+} from '#root/src/tools/mutations/request-next-round.js';
+import type { ToolContract } from '#root/src/tools/types.js';
 
-export const toolRegistry = [
-  defineToolContract({
-    name: 'get_review_round',
-    title: 'Review Round',
-    description: 'Read the current review round for a pull request.',
-    actorScopes: ['agent', 'event_source'] as const,
-    inputSchemaName: 'get_review_round.input',
-    outputSchemaName: 'get_review_round.output',
-    inputSchema: getReviewRoundInputSchema,
-    outputSchema: getReviewRoundOutputSchema,
-    handler: getReviewRound
-  }),
-  defineToolContract({
-    name: 'pr_status',
-    title: 'PR Status',
-    description: 'Read advisory status for a pull request.',
-    actorScopes: ['agent', 'operator', 'event_source'] as const,
-    inputSchemaName: 'pr_status.input',
-    outputSchemaName: 'pr_status.output',
-    inputSchema: prStatusInputSchema,
-    outputSchema: prStatusOutputSchema,
-    handler: getPrStatus
-  })
-] as const;
+const notImplemented = (toolName: string) => async (_input: unknown) => {
+  return err(notImplementedError(toolName));
+};
 
-export type ToolName = (typeof toolRegistry)[number]['name'];
+export function createToolRegistry(context: ToolExecutionContext) {
+  return [
+    {
+      name: 'review.get_state',
+      title: 'Review State',
+      description: 'Read the current gated-review state for a review thread.',
+      actorScopes: ['agent', 'operator', 'event_source'] as const,
+      inputSchemaName: 'review.get_state.input',
+      outputSchemaName: 'review.get_state.output',
+      inputSchema: reviewStateInputSchema,
+      outputSchema: reviewStateOutputSchema,
+      handler: notImplemented('review.get_state')
+    },
+    {
+      name: 'review.list_actions',
+      title: 'Review Actions',
+      description: 'List curated actions that have been taken for a review thread.',
+      actorScopes: ['agent', 'operator'] as const,
+      inputSchemaName: 'review.list_actions.input',
+      outputSchemaName: 'review.list_actions.output',
+      inputSchema: reviewActionsInputSchema,
+      outputSchema: reviewActionsOutputSchema,
+      handler: notImplemented('review.list_actions')
+    },
+    {
+      name: 'review.record_event',
+      title: 'Review Event',
+      description: 'Record a review event from an external source.',
+      actorScopes: ['event_source'] as const,
+      inputSchemaName: 'review.record_event.input',
+      outputSchemaName: 'review.record_event.output',
+      inputSchema: reviewEventInputSchema,
+      outputSchema: reviewEventReceiptOutputSchema,
+      handler: notImplemented('review.record_event')
+    },
+    {
+      name: 'review.apply_decision',
+      title: 'Apply Review Decision',
+      description: 'Apply an operator decision to a gated review.',
+      actorScopes: ['operator'] as const,
+      inputSchemaName: 'review.apply_decision.input',
+      outputSchemaName: 'review.apply_decision.output',
+      inputSchema: reviewDecisionInputSchema,
+      outputSchema: reviewDecisionOutputSchema,
+      handler: notImplemented('review.apply_decision')
+    },
+    {
+      name: 'open_pr',
+      title: 'Open Pull Request',
+      description: 'Open a pull request in the configured repository scope.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'open_pr.input',
+      outputSchemaName: 'open_pr.output',
+      inputSchema: openPrInputSchema,
+      outputSchema: openPrOutputSchema,
+      handler: createOpenPrHandler(context)
+    },
+    {
+      name: 'reply_to_thread',
+      title: 'Reply To Thread',
+      description: 'Reply to a GitHub review thread.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'reply_to_thread.input',
+      outputSchemaName: 'reply_to_thread.output',
+      inputSchema: replyToThreadInputSchema,
+      outputSchema: replyToThreadOutputSchema,
+      handler: createReplyToThreadHandler(context)
+    },
+    {
+      name: 'resolve_thread',
+      title: 'Resolve Thread',
+      description: 'Resolve a GitHub review thread.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'resolve_thread.input',
+      outputSchemaName: 'resolve_thread.output',
+      inputSchema: resolveThreadInputSchema,
+      outputSchema: resolveThreadOutputSchema,
+      handler: createResolveThreadHandler(context)
+    },
+    {
+      name: 'request_next_round',
+      title: 'Request Next Round',
+      description: 'Request another CodeRabbit review round on a pull request.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'request_next_round.input',
+      outputSchemaName: 'request_next_round.output',
+      inputSchema: requestNextRoundInputSchema,
+      outputSchema: requestNextRoundOutputSchema,
+      handler: createRequestNextRoundHandler(context)
+    },
+    {
+      name: 'get_review_round',
+      title: 'Review Round',
+      description: 'Read the current review round for a pull request.',
+      actorScopes: ['agent', 'event_source'] as const,
+      inputSchemaName: 'get_review_round.input',
+      outputSchemaName: 'get_review_round.output',
+      inputSchema: getReviewRoundInputSchema,
+      outputSchema: getReviewRoundOutputSchema,
+      handler: (input) => getReviewRound(input as GetReviewRoundInput, context)
+    },
+    {
+      name: 'pr_status',
+      title: 'PR Status',
+      description: 'Read advisory status for a pull request.',
+      actorScopes: ['agent', 'operator', 'event_source'] as const,
+      inputSchemaName: 'pr_status.input',
+      outputSchemaName: 'pr_status.output',
+      inputSchema: prStatusInputSchema,
+      outputSchema: prStatusOutputSchema,
+      handler: (input) => getPrStatus(input as PrStatusInput, context)
+    }
+  ] as const satisfies readonly ToolContract<z.ZodTypeAny, z.ZodTypeAny>[];
+}
 
-export function getToolContract(name: ToolName) {
-  return toolRegistry.find((tool) => tool.name === name);
+export type ToolName = ReturnType<typeof createToolRegistry>[number]['name'];
+
+export function getToolContract(name: ToolName, context: ToolExecutionContext) {
+  return createToolRegistry(context).find((tool) => tool.name === name);
 }

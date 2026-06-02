@@ -14,6 +14,12 @@ export type ToolDomainError =
       detail: string;
     }
   | {
+      kind: 'github_error';
+      operation: string;
+      entity: ToolEntity;
+      detail: string;
+    }
+  | {
       kind: 'validation_rejected';
       operation: string;
       entity: ToolEntity;
@@ -36,6 +42,15 @@ export function notImplementedError(operation: string, detail = 'Tool is not imp
 export function githubRequestFailedError(operation: string, detail: string): ToolDomainError {
   return {
     kind: 'github_request_failed',
+    operation,
+    entity: toolEntity(operation),
+    detail
+  };
+}
+
+export function githubError(operation: string, detail: string): ToolDomainError {
+  return {
+    kind: 'github_error',
     operation,
     entity: toolEntity(operation),
     detail
