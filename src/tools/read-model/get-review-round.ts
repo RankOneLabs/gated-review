@@ -19,10 +19,10 @@ import type {
   ReviewRound
 } from '#root/src/tools/read-model/types.js';
 
-export type GetReviewRoundInput = Readonly<{
+export type GetReviewRoundInput = {
   pullRequestNumber: number;
   includeResolved?: boolean;
-}>;
+};
 
 const operationName = 'get_review_round';
 const graphqlRequestLabel = 'POST /graphql';
@@ -137,7 +137,7 @@ async function requestSummaryCommentsPage(
 async function loadThreadComments(
   context: ToolExecutionContext,
   threadId: string
-): Promise<Result<ReadonlyArray<ReadModelThreadComment>, ToolDomainError>> {
+): Promise<Result<ReadModelThreadComment[], ToolDomainError>> {
   const comments: Array<ReadModelThreadComment> = [];
   let after: string | null = null;
 
@@ -178,7 +178,7 @@ async function loadThreadComments(
 async function loadSummaryComments(
   context: ToolExecutionContext,
   pullRequestNumber: number
-): Promise<Result<ReadonlyArray<ReadModelSummaryComment>, ToolDomainError>> {
+): Promise<Result<ReadModelSummaryComment[], ToolDomainError>> {
   const summaries: Array<ReadModelSummaryComment> = [];
   let after: string | null = null;
 

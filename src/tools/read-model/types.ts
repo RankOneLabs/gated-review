@@ -19,7 +19,7 @@ export type ReadModelReviewThread = Readonly<{
   state: ReadModelThreadState;
   path: string | null;
   line: number | null;
-  comments: ReadonlyArray<ReadModelThreadComment>;
+  comments: ReadModelThreadComment[];
 }>;
 
 export type ReadModelSummaryComment = Readonly<{
@@ -33,8 +33,8 @@ export type ReviewRound = Readonly<{
   pullRequestNumber: number;
   includeResolved: boolean;
   openThreadCount: number;
-  threads: ReadonlyArray<ReadModelReviewThread>;
-  summaries: ReadonlyArray<ReadModelSummaryComment>;
+  threads: ReadModelReviewThread[];
+  summaries: ReadModelSummaryComment[];
 }>;
 
 export type GitHubCheckState = 'success' | 'failure' | 'error' | 'pending';
@@ -49,7 +49,7 @@ export type ReadModelChecksSummary = Readonly<{
   totalCount: number;
   failingCount: number;
   pendingCount: number;
-  contexts: ReadonlyArray<ReadModelCheckContext>;
+  contexts: ReadModelCheckContext[];
 }>;
 
 export type MergeReadyState = Readonly<{

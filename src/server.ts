@@ -3,10 +3,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { describeToolError, validationRejectedError } from '#root/src/errors.js';
 import { isOk } from '#root/src/result.js';
+import { loadToolExecutionContext, type ToolExecutionContext } from '#root/src/tools/context.js';
 import { toolRegistry } from '#root/src/tools/registry.js';
-import { reviewDecisionOutputSchema } from '#root/src/tools/schemas.js';
 
-export function createServer() {
+export function createServer(context: ToolExecutionContext) {
   const server = new McpServer({
     name: 'gated-review',
     version: '0.1.0'
@@ -36,7 +36,7 @@ export function createServer() {
           };
         }
 
-        const outcome = await tool.handler(parsedInput.data);
+        const outcome = await tool.handler(parsedInput.data, context);
         if (isOk(outcome)) {
           const parsedOutput = tool.outputSchema.safeParse(outcome.value);
           if (!parsedOutput.success) {
@@ -50,15 +50,6 @@ export function createServer() {
               content: [{ type: 'text' as const, text: describeToolError(rejection) }],
               isError: true
             };
-          }
-
-          if (tool.name === 'review.apply_decision') {
-            const decisionOutput = reviewDecisionOutputSchema.parse(parsedOutput.data);
-            console.info('[gated-review] tool decision', {
-              operation: tool.name,
-              entity: { kind: 'tool', name: tool.name },
-              detail: `decision ${decisionOutput.decisionId} -> ${decisionOutput.finalStatus}`
-            });
           }
 
           return {
@@ -84,6 +75,7 @@ export function createServer() {
 }
 
 export async function runStdioServer() {
-  const server = createServer();
+  const context = await loadToolExecutionContext();
+  const server = createServer(context);
   await server.connect(new StdioServerTransport());
 }

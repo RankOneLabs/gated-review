@@ -214,7 +214,7 @@ export const reviewThreadCommentsQuery = `
 `;
 
 export const prStatusQuery = `
-  query PrStatusQuery($owner: String!, $repo: String!, $number: Int!, $after: String) {
+  query PrStatusQuery($owner: String!, $repo: String!, $number: Int!, $after: String, $labelsAfter: String) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
         headRefOid
@@ -227,7 +227,7 @@ export const prStatusQuery = `
             endCursor
           }
         }
-        labels(first: 100) {
+        labels(first: 100, after: $labelsAfter) {
           nodes {
             name
           }
