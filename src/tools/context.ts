@@ -16,7 +16,7 @@ export function createToolExecutionContext(
 }
 
 function parseRepositoryScope(repository: string): GitHubRepositoryScope {
-  const [owner, repo, ...rest] = repository.split('/');
+  const [owner, repo, ...rest] = repository.trim().split('/');
   if (!owner || !repo || rest.length > 0) {
     throw new Error('GITHUB_REPOSITORY must be in owner/repo form.');
   }

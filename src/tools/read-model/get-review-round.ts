@@ -88,22 +88,34 @@ async function requestReviewThreadsPage(
   return ok(response.value);
 }
 
+async function loadThreadCommentsBatched(
+  context: ToolExecutionContext,
+  threadIds: ReadonlyArray<string>,
+  batchSize = 4
+): Promise<Result<ReadonlyArray<ReadModelThreadComment[]>, ToolDomainError>> {
+  const comments: Array<ReadModelThreadComment[]> = [];
+
+  for (let index = 0; index < threadIds.length; index += batchSize) {
+    const batch = threadIds.slice(index, index + batchSize);
+    const batchResults = await Promise.all(batch.map((threadId) => loadThreadComments(context, threadId)));
+
+    for (const result of batchResults) {
+      if (!result.ok) {
+        return result;
+      }
+
+      comments.push(result.value);
+    }
+  }
+
+  return ok(comments);
+}
+
 async function loadThreadCommentsBatch(
   context: ToolExecutionContext,
   threadIds: ReadonlyArray<string>
 ): Promise<Result<ReadonlyArray<ReadModelThreadComment[]>, ToolDomainError>> {
-  const results = await Promise.all(threadIds.map((threadId) => loadThreadComments(context, threadId)));
-
-  const comments: Array<ReadModelThreadComment[]> = [];
-  for (const result of results) {
-    if (!result.ok) {
-      return result;
-    }
-
-    comments.push(result.value);
-  }
-
-  return ok(comments);
+  return loadThreadCommentsBatched(context, threadIds);
 }
 
 async function requestThreadCommentsPage(

@@ -24,11 +24,19 @@ export type GraphQLReviewThreadNode = Readonly<{
   isResolved: boolean;
   path: string | null;
   line: number | null;
-  comments: GraphQLReviewCommentConnection;
 }>;
 
 export type GraphQLReviewThreadConnection = Readonly<{
   nodes: ReadonlyArray<GraphQLReviewThreadNode>;
+  pageInfo: GraphQLPageInfo;
+}>;
+
+export type GraphQLReviewThreadWithCommentsNode = GraphQLReviewThreadNode & Readonly<{
+  comments: GraphQLReviewCommentConnection;
+}>;
+
+export type GraphQLReviewThreadWithCommentsConnection = Readonly<{
+  nodes: ReadonlyArray<GraphQLReviewThreadWithCommentsNode>;
   pageInfo: GraphQLPageInfo;
 }>;
 
@@ -56,7 +64,7 @@ export type GraphQLLabelConnection = Readonly<{
 export type GraphQLReviewRoundQueryData = Readonly<{
   repository: Readonly<{
     pullRequest: Readonly<{
-      reviewThreads: GraphQLReviewThreadConnection;
+      reviewThreads: GraphQLReviewThreadWithCommentsConnection;
       comments: GraphQLIssueCommentConnection;
     } | null>;
   }> | null;
