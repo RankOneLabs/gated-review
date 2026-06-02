@@ -17,9 +17,13 @@ type SpawnResponse = Readonly<{
 }>;
 
 function createSpawnMock(responses: SpawnResponse[]) {
-  const calls: Array<{ command: string; args: readonly string[] }> = [];
-  const spawn: GitSpawn = vi.fn((command, args) => {
-    calls.push({ command, args });
+  const calls: Array<{
+    command: string;
+    args: readonly string[];
+    options: Parameters<GitSpawn>[2];
+  }> = [];
+  const spawn: GitSpawn = vi.fn((command, args, options) => {
+    calls.push({ command, args, options });
 
     const response = responses.shift();
     if (response?.throwError !== undefined) {
@@ -71,12 +75,16 @@ describe('git runner', () => {
       { stdout: 'https://github.com/example/repo.git\n' },
       { stdout: '', stderr: '', exitCode: 0 }
     ]);
+    const tokenProvider = vi.fn(createTokenProvider('token-123').getInstallationToken);
 
     const result = await pushGitRepository(
       { repo_path: repoPath },
       {
         installationId: 42,
-        tokenProvider: createTokenProvider('token-123'),
+        tokenProvider: {
+          getInstallationToken: tokenProvider
+        },
+        githubHosts: ['github.com'],
         spawn
       }
     );
@@ -99,6 +107,9 @@ describe('git runner', () => {
         'feature/main'
       ]
     ]);
+    expect(calls[0]?.options.env?.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(calls[0]?.options.env?.GCM_INTERACTIVE).toBe('never');
+    expect(tokenProvider).toHaveBeenCalledTimes(1);
   });
 
   it('pulls with rebase and returns the resulting HEAD sha', async () => {
@@ -116,6 +127,7 @@ describe('git runner', () => {
       {
         installationId: 42,
         tokenProvider: createTokenProvider('token-123'),
+        githubHosts: ['github.com'],
         spawn
       }
     );
@@ -159,6 +171,7 @@ describe('git runner', () => {
       {
         installationId: 42,
         tokenProvider: createTokenProvider('token-123'),
+        githubHosts: ['github.com'],
         spawn
       }
     );
@@ -173,5 +186,37 @@ describe('git runner', () => {
       expect(result.error.detail).toContain('AUTHORIZATION: basic [redacted]');
       expect(result.error.detail).not.toContain('token-123');
     }
+  });
+
+  it('rejects a non-allowlisted origin host before minting a token', async () => {
+    const repoPath = mkdtempSync(join(tmpdir(), 'gated-review-'));
+    const { spawn } = createSpawnMock([
+      { stdout: 'true\n' },
+      { stdout: 'feature/main\n' },
+      { stdout: 'https://example.com/example/repo.git\n' }
+    ]);
+    const tokenProvider = vi.fn(async () => ({
+      ok: true as const,
+      value: 'token-123'
+    }));
+
+    const result = await pushGitRepository(
+      { repo_path: repoPath },
+      {
+        installationId: 42,
+        tokenProvider: {
+          getInstallationToken: tokenProvider
+        },
+        githubHosts: ['github.com'],
+        spawn
+      }
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.kind).toBe('validation_rejected');
+      expect(result.error.detail).toContain('not an allowed GitHub host');
+    }
+    expect(tokenProvider).not.toHaveBeenCalled();
   });
 });

@@ -74,7 +74,14 @@ export const toolRegistry: readonly ToolContract<ZodTypeAny, ZodTypeAny>[] = [
   gitFetchTool
 ];
 
-export type ToolName = (typeof toolRegistry)[number]['name'];
+export type ToolName =
+  | 'review.get_state'
+  | 'review.list_actions'
+  | 'review.record_event'
+  | 'review.apply_decision'
+  | 'git.push'
+  | 'git.pull'
+  | 'git.fetch';
 
 export function getToolContract(name: ToolName) {
   return toolRegistry.find((tool) => tool.name === name);

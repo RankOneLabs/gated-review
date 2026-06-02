@@ -61,6 +61,7 @@ describe('git tool handlers', () => {
       value: {
         installationId: 42,
         tokenProvider: createTokenProvider('token-123'),
+        githubHosts: ['github.com'],
         spawn
       }
     });
@@ -85,6 +86,7 @@ describe('git tool handlers', () => {
       value: {
         installationId: 42,
         tokenProvider: createTokenProvider('token-123'),
+        githubHosts: ['github.com'],
         spawn
       }
     });
@@ -107,6 +109,7 @@ describe('git tool handlers', () => {
       value: {
         installationId: 42,
         tokenProvider: createTokenProvider('token-123'),
+        githubHosts: ['github.com'],
         spawn
       }
     });

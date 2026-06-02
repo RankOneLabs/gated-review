@@ -12,6 +12,15 @@ function toRuntimeError(detail: string): ToolDomainError {
   return validationRejectedError('git.runtime', detail);
 }
 
+function deriveGitHubHosts(apiBaseUrl: string): readonly string[] {
+  const host = new URL(apiBaseUrl).host;
+  if (host.startsWith('api.') && host.length > 4) {
+    return [host, host.slice(4)];
+  }
+
+  return [host];
+}
+
 async function loadDefaultGitRunnerDependencies(): Promise<Result<GitRunnerDependencies, ToolDomainError>> {
   const config = await loadGitHubAppConfig();
   if (!config.ok) {
@@ -25,7 +34,8 @@ async function loadDefaultGitRunnerDependencies(): Promise<Result<GitRunnerDepen
 
   return ok({
     installationId: config.value.installationId,
-    tokenProvider: new GitHubInstallationTokenCache(auth.value)
+    tokenProvider: new GitHubInstallationTokenCache(auth.value),
+    githubHosts: deriveGitHubHosts(config.value.apiBaseUrl)
   });
 }
 

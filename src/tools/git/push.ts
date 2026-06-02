@@ -3,7 +3,6 @@ import { z } from 'zod';
 import type { Result } from '#root/src/result.js';
 import type { ToolDomainError } from '#root/src/errors.js';
 import type { ToolContract } from '#root/src/tools/types.js';
-import { actorScopes } from '#root/src/tools/actors.js';
 import {
   pushGitRepository,
   type GitPushInput,

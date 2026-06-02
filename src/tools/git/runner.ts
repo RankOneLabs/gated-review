@@ -40,6 +40,7 @@ export type GitFetchOutput = Readonly<{
 export type GitRunnerDependencies = Readonly<{
   installationId: number;
   tokenProvider: GitHubInstallationTokenProvider;
+  githubHosts: readonly string[];
   spawn?: GitSpawn;
 }>;
 
@@ -59,6 +60,14 @@ type SpawnedCommandResult = {
 
 function defaultSpawn(command: string, args: readonly string[], options: SpawnOptionsWithoutStdio) {
   return spawn(command, args, options);
+}
+
+function buildSpawnEnvironment() {
+  return {
+    ...process.env,
+    GCM_INTERACTIVE: 'never',
+    GIT_TERMINAL_PROMPT: '0'
+  };
 }
 
 function trimStdout(stdout: string) {
@@ -108,6 +117,7 @@ function executeGitCommand(
     let childProcess: ChildProcessWithoutNullStreams;
     try {
       childProcess = spawnImpl(command, args, {
+        env: buildSpawnEnvironment(),
         stdio: ['pipe', 'pipe', 'pipe']
       });
     } catch (error: unknown) {
@@ -208,6 +218,7 @@ async function resolveCurrentBranch(
 
 async function resolveRemoteHost(
   repoPath: string,
+  allowedHosts: readonly string[],
   spawnImpl: GitSpawn
 ): Promise<Result<string, ToolDomainError>> {
   const remoteResult = await executeGitCommand(
@@ -238,6 +249,10 @@ async function resolveRemoteHost(
 
   if (parsedUrl.username !== '' || parsedUrl.password !== '') {
     return err(toValidationError('git.remote', 'origin remote must not embed credentials.'));
+  }
+
+  if (!allowedHosts.includes(parsedUrl.host)) {
+    return err(toValidationError('git.remote', `origin host ${parsedUrl.host} is not an allowed GitHub host.`));
   }
 
   return ok(parsedUrl.host);
@@ -271,7 +286,11 @@ async function runRemoteGitCommand(
   repoPath: string,
   command: readonly string[]
 ): Promise<Result<SpawnedCommandResult, ToolDomainError>> {
-  const host = await resolveRemoteHost(repoPath, dependencies.spawn ?? defaultSpawn);
+  const host = await resolveRemoteHost(
+    repoPath,
+    dependencies.githubHosts,
+    dependencies.spawn ?? defaultSpawn
+  );
   if (!host.ok) {
     return host;
   }
