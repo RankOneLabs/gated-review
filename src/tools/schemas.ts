@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ActionId, DecisionId, EventId, ReviewId } from '#root/src/domain.js';
+import { actorScopes } from '#root/src/tools/actors.js';
 
 export const reviewIdSchema = z.string().min(1).transform((value): ReviewId => value as ReviewId);
 export const actionIdSchema = z.string().min(1).transform((value): ActionId => value as ActionId);
@@ -32,7 +33,7 @@ export const reviewStateOutputSchema = z
       .object({
         name: z.string().min(1),
         isOpen: z.boolean(),
-        actorScope: z.enum(['agent', 'operator', 'event_source'])
+        actorScope: z.enum(actorScopes)
       })
       .strict(),
     lastUpdatedAt: z.string().datetime()
@@ -51,7 +52,7 @@ export const reviewActionSchema = z
   .object({
     actionId: actionIdSchema,
     kind: z.string().min(1),
-    actorScope: z.enum(['agent', 'operator', 'event_source']),
+    actorScope: z.enum(actorScopes),
     createdAt: z.string().datetime()
   })
   .strict();

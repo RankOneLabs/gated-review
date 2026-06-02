@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { describeToolError, validationRejectedError } from '#root/src/errors.js';
 import { isOk } from '#root/src/result.js';
 import { toolRegistry } from '#root/src/tools/registry.js';
+import { reviewDecisionOutputSchema } from '#root/src/tools/schemas.js';
 
 export function createServer() {
   const server = new McpServer({
@@ -37,21 +38,32 @@ export function createServer() {
 
         const outcome = await tool.handler(parsedInput.data);
         if (isOk(outcome)) {
-          if (tool.name === 'review.apply_decision') {
-            const decision = outcome.value as {
-              decisionId: string;
-              finalStatus: string;
+          const parsedOutput = tool.outputSchema.safeParse(outcome.value);
+          if (!parsedOutput.success) {
+            const rejection = validationRejectedError(tool.name, parsedOutput.error.message);
+            console.warn('[gated-review] tool rejection', {
+              operation: rejection.operation,
+              entity: rejection.entity,
+              detail: rejection.detail
+            });
+            return {
+              content: [{ type: 'text' as const, text: describeToolError(rejection) }],
+              isError: true
             };
+          }
+
+          if (tool.name === 'review.apply_decision') {
+            const decisionOutput = reviewDecisionOutputSchema.parse(parsedOutput.data);
             console.info('[gated-review] tool decision', {
               operation: tool.name,
               entity: { kind: 'tool', name: tool.name },
-              detail: `decision ${decision.decisionId} -> ${decision.finalStatus}`
+              detail: `decision ${decisionOutput.decisionId} -> ${decisionOutput.finalStatus}`
             });
           }
 
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(outcome.value) }],
-            structuredContent: outcome.value
+            content: [{ type: 'text' as const, text: JSON.stringify(parsedOutput.data) }],
+            structuredContent: parsedOutput.data
           };
         }
 
