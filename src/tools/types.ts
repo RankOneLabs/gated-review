@@ -39,7 +39,5 @@ export interface ToolContract<
   readonly outputSchemaName: string;
   readonly inputSchema: TInputSchema;
   readonly outputSchema: TOutputSchema;
-  readonly handler: (
-    input: z.output<TInputSchema>
-  ) => Promise<Result<z.output<TOutputSchema>, ToolDomainError>>;
+  handler(input: z.output<TInputSchema>): Promise<Result<z.output<TOutputSchema>, ToolDomainError>>;
 }

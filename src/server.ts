@@ -1,12 +1,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
+import { createGitHubClient } from '#root/src/github/client.js';
+import { loadGitHubAppConfig } from '#root/src/config.js';
 import { describeToolError, validationRejectedError } from '#root/src/errors.js';
 import { isOk } from '#root/src/result.js';
-import { toolRegistry } from '#root/src/tools/registry.js';
+import { createToolRegistry } from '#root/src/tools/registry.js';
+import { createToolExecutionContext } from '#root/src/tools/context.js';
+import { resolveRepositoryScope } from '#root/src/tools/mutations/repository.js';
 import { reviewDecisionOutputSchema } from '#root/src/tools/schemas.js';
-import type { ToolContract } from '#root/src/tools/types.js';
 import type { ZodTypeAny } from 'zod';
+
+import type { ToolContract } from '#root/src/tools/types.js';
 
 function createToolHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
   return async (input: unknown) => {
@@ -67,15 +72,13 @@ function createToolHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
   };
 }
 
-export function createServer() {
+export function createServer(context: import('#root/src/tools/context.js').ToolExecutionContext) {
   const server = new McpServer({
     name: 'gated-review',
     version: '0.1.0'
   });
 
-  const registeredTools = toolRegistry as readonly ToolContract<ZodTypeAny, ZodTypeAny, string>[];
-
-  for (const tool of registeredTools) {
+  for (const tool of createToolRegistry(context)) {
     server.registerTool(
       tool.name,
       {
@@ -92,6 +95,22 @@ export function createServer() {
 }
 
 export async function runStdioServer() {
-  const server = createServer();
+  const configResult = await loadGitHubAppConfig();
+  if (!configResult.ok) {
+    throw new Error(configResult.error.detail);
+  }
+
+  const githubClientResult = createGitHubClient(configResult.value);
+  if (!githubClientResult.ok) {
+    throw new Error(githubClientResult.error.message);
+  }
+
+  const repositoryResult = await resolveRepositoryScope();
+  if (!repositoryResult.ok) {
+    throw new Error(repositoryResult.error.detail);
+  }
+
+  const context = createToolExecutionContext(githubClientResult.value, repositoryResult.value);
+  const server = createServer(context);
   await server.connect(new StdioServerTransport());
 }
