@@ -1,6 +1,10 @@
+import { z } from 'zod';
+
 import { err, ok, type Result } from '#root/src/result.js';
 import { githubRequestFailedError, type ToolDomainError } from '#root/src/errors.js';
+import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import { getReviewRoundInputSchema } from '#root/src/tools/schemas.js';
 import { tagEntity } from '#root/src/tools/read-model/entity.js';
 import {
   reviewRoundSummariesQuery,
@@ -26,6 +30,14 @@ export type GetReviewRoundInput = {
 
 const operationName = 'get_review_round';
 const graphqlRequestLabel = 'POST /graphql';
+
+function mapGitHubError(error: GitHubError): ToolDomainError {
+  const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
+  return githubRequestFailedError(
+    operationName,
+    `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`
+  );
+}
 
 function isPresent(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim() !== '';
@@ -82,7 +94,7 @@ async function requestReviewThreadsPage(
   });
 
   if (!response.ok) {
-    return err(githubRequestFailedError(operationName, response.error.message));
+    return err(mapGitHubError(response.error));
   }
 
   return ok(response.value);
@@ -134,7 +146,7 @@ async function requestThreadCommentsPage(
   });
 
   if (!response.ok) {
-    return err(githubRequestFailedError(operationName, response.error.message));
+    return err(mapGitHubError(response.error));
   }
 
   return ok(response.value);
@@ -158,7 +170,7 @@ async function requestSummaryCommentsPage(
   });
 
   if (!response.ok) {
-    return err(githubRequestFailedError(operationName, response.error.message));
+    return err(mapGitHubError(response.error));
   }
 
   return ok(response.value);
@@ -252,9 +264,10 @@ async function loadSummaryComments(
 }
 
 export async function getReviewRound(
-  input: GetReviewRoundInput,
+  input: unknown,
   context: ToolExecutionContext
 ): Promise<Result<ReviewRound, ToolDomainError>> {
+  const parsedInput = getReviewRoundInputSchema.parse(input);
   const threads: Array<{
     id: string;
     state: 'open' | 'resolved';
@@ -265,7 +278,7 @@ export async function getReviewRound(
   let after: string | null = null;
 
   while (true) {
-    const page = await requestReviewThreadsPage(context, input.pullRequestNumber, after);
+    const page = await requestReviewThreadsPage(context, parsedInput.pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -273,7 +286,7 @@ export async function getReviewRound(
     const pullRequest = page.value.repository?.pullRequest;
     if (!pullRequest) {
       return err(
-        githubRequestFailedError(operationName, `Pull request #${input.pullRequestNumber} was not found.`)
+        githubRequestFailedError(operationName, `Pull request #${parsedInput.pullRequestNumber} was not found.`)
       );
     }
 
@@ -282,7 +295,7 @@ export async function getReviewRound(
         openThreadCount += 1;
       }
 
-      if (thread.isResolved && !input.includeResolved) {
+      if (thread.isResolved && !parsedInput.includeResolved) {
         continue;
       }
 
@@ -300,7 +313,7 @@ export async function getReviewRound(
 
     if (!pullRequest.reviewThreads.pageInfo.endCursor) {
       return err(
-        githubRequestFailedError(operationName, `Pull request #${input.pullRequestNumber} returned a missing cursor.`)
+        githubRequestFailedError(operationName, `Pull request #${parsedInput.pullRequestNumber} returned a missing cursor.`)
       );
     }
 
@@ -315,14 +328,14 @@ export async function getReviewRound(
     return comments;
   }
 
-  const summaries = await loadSummaryComments(context, input.pullRequestNumber);
+  const summaries = await loadSummaryComments(context, parsedInput.pullRequestNumber);
   if (!summaries.ok) {
     return summaries;
   }
 
   return ok({
-    pullRequestNumber: input.pullRequestNumber,
-    includeResolved: input.includeResolved ?? false,
+    pullRequestNumber: parsedInput.pullRequestNumber,
+    includeResolved: parsedInput.includeResolved ?? false,
     openThreadCount,
     threads: threads.map((thread, index) => ({
       ...thread,

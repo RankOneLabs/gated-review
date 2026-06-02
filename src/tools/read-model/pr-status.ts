@@ -1,7 +1,11 @@
+import { z } from 'zod';
+
 import { err, ok, type Result } from '#root/src/result.js';
 import { githubRequestFailedError, type ToolDomainError } from '#root/src/errors.js';
+import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { summarizeChecks } from '#root/src/tools/read-model/checks.js';
+import { prStatusInputSchema } from '#root/src/tools/schemas.js';
 import {
   prStatusLabelsQuery,
   prStatusQuery,
@@ -16,6 +20,14 @@ export type PrStatusInput = {
 
 const operationName = 'pr_status';
 const graphqlRequestLabel = 'POST /graphql';
+
+function mapGitHubError(error: GitHubError): ToolDomainError {
+  const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
+  return githubRequestFailedError(
+    operationName,
+    `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`
+  );
+}
 
 async function requestPrStatusPage(
   context: ToolExecutionContext,
@@ -35,7 +47,7 @@ async function requestPrStatusPage(
   });
 
   if (!response.ok) {
-    return err(githubRequestFailedError(operationName, response.error.message));
+    return err(mapGitHubError(response.error));
   }
 
   return ok(response.value);
@@ -111,7 +123,7 @@ async function requestMergeReadyPage(
   });
 
   if (!response.ok) {
-    return err(githubRequestFailedError(operationName, response.error.message));
+    return err(mapGitHubError(response.error));
   }
 
   return ok(response.value);
@@ -155,15 +167,17 @@ async function loadMergeReadyState(
 }
 
 export async function getPrStatus(
-  input: PrStatusInput,
+  input: unknown,
   context: ToolExecutionContext
 ): Promise<Result<PullRequestStatus, ToolDomainError>> {
-  const openThreads = await loadOpenThreadCount(context, input.pullRequestNumber);
+  const parsedInput = prStatusInputSchema.parse(input);
+
+  const openThreads = await loadOpenThreadCount(context, parsedInput.pullRequestNumber);
   if (!openThreads.ok) {
     return openThreads;
   }
 
-  const mergeReady = await loadMergeReadyState(context, input.pullRequestNumber);
+  const mergeReady = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
   if (!mergeReady.ok) {
     return mergeReady;
   }
@@ -173,11 +187,11 @@ export async function getPrStatus(
     openThreads.value.headRefOid
   );
   if (!status.ok) {
-    return err(githubRequestFailedError(operationName, status.error.message));
+    return err(mapGitHubError(status.error));
   }
 
   return ok({
-    pullRequestNumber: input.pullRequestNumber,
+    pullRequestNumber: parsedInput.pullRequestNumber,
     openThreadCount: openThreads.value.openThreadCount,
     mergeReady: {
       isReady: mergeReady.value,

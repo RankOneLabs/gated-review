@@ -40,7 +40,7 @@ import {
   requestNextRoundInputSchema,
   requestNextRoundOutputSchema
 } from '#root/src/tools/mutations/request-next-round.js';
-import type { GetReviewRoundInput, PrStatusInput, ToolContract } from '#root/src/tools/types.js';
+import type { ToolContract } from '#root/src/tools/types.js';
 import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
 import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
 
@@ -180,7 +180,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'get_review_round.output',
       inputSchema: getReviewRoundInputSchema,
       outputSchema: getReviewRoundOutputSchema,
-      handler: (input) => getReviewRound(input as GetReviewRoundInput, context)
+      handler: (input) => getReviewRound(input, context)
     },
     {
       name: 'pr_status',
@@ -191,7 +191,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'pr_status.output',
       inputSchema: prStatusInputSchema,
       outputSchema: prStatusOutputSchema,
-      handler: (input) => getPrStatus(input as PrStatusInput, context)
+      handler: (input) => getPrStatus(input, context)
     }
   ] as const satisfies readonly ToolContract<z.ZodTypeAny, z.ZodTypeAny, string>[];
 }
