@@ -52,7 +52,7 @@ describe('addPullRequestReviewThreadReply', () => {
     expect(result.ok).toBe(true);
     expect(requests).toEqual([
       {
-        operationName: 'add_pull_request_review_thread_reply',
+        operationName: 'AddPullRequestReviewThreadReply',
         query: expect.any(String),
         variables: {
           threadId: 'thread-123',

@@ -32,7 +32,7 @@ export function addPullRequestReviewThreadReply(
   input: AddPullRequestReviewThreadReplyInput
 ): Promise<Result<AddPullRequestReviewThreadReplyResponse, GitHubError>> {
   return client.request<AddPullRequestReviewThreadReplyResponse>({
-    operationName: 'add_pull_request_review_thread_reply',
+    operationName: 'AddPullRequestReviewThreadReply',
     requestLabel: 'POST /graphql',
     query: `
       mutation AddPullRequestReviewThreadReply($threadId: ID!, $body: String!) {
@@ -57,7 +57,7 @@ export function resolveReviewThread(
   input: ResolveReviewThreadInput
 ): Promise<Result<ResolveReviewThreadResponse, GitHubError>> {
   return client.request<ResolveReviewThreadResponse>({
-    operationName: 'resolve_review_thread',
+    operationName: 'ResolveReviewThread',
     requestLabel: 'POST /graphql',
     query: `
       mutation ResolveReviewThread($threadId: ID!) {

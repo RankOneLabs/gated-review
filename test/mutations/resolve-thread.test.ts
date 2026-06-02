@@ -51,7 +51,7 @@ describe('resolveReviewThread', () => {
     expect(result.ok).toBe(true);
     expect(requests).toEqual([
       {
-        operationName: 'resolve_review_thread',
+        operationName: 'ResolveReviewThread',
         query: expect.any(String),
         variables: {
           threadId: 'thread-123'
