@@ -2,7 +2,6 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { createGitHubError, type GitHubError } from '#root/src/github/errors.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { GitHubFetch } from '#root/src/github/fetch.js';
-import { resolveGitHubUrl } from '#root/src/github/url.js';
 
 export type GitHubGraphQLPrimitive = string | number | boolean | null;
 export type GitHubGraphQLValue = GitHubGraphQLPrimitive | ReadonlyArray<unknown> | Readonly<Record<string, unknown>>;
@@ -39,7 +38,7 @@ export type GitHubGraphQLClientDependencies = {
 };
 
 export type GitHubGraphQLClientOptions = {
-  baseUrl: string;
+  graphqlUrl: string;
   installationId: number;
   tokenProvider: GitHubInstallationTokenProvider;
 };
@@ -86,7 +85,7 @@ export function createGitHubGraphQLClient(
 
       let response: Response;
       try {
-        response = await fetchFn(resolveGitHubUrl(options.baseUrl, 'graphql'), {
+        response = await fetchFn(options.graphqlUrl, {
           method: 'POST',
           headers: {
             Accept: 'application/vnd.github+json',

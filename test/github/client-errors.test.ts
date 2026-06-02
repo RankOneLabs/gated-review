@@ -15,7 +15,7 @@ describe('GitHub client error shaping', () => {
   it('returns shaped GraphQL errors without exposing request credentials', async () => {
     const client = createGitHubGraphQLClient(
       {
-        baseUrl: 'https://api.github.com',
+        graphqlUrl: 'https://api.github.com/graphql',
         installationId: 99,
         tokenProvider
       },
@@ -59,7 +59,7 @@ describe('GitHub client error shaping', () => {
   it('converts GraphQL transport failures into shaped errors', async () => {
     const client = createGitHubGraphQLClient(
       {
-        baseUrl: 'https://api.github.com',
+        graphqlUrl: 'https://api.github.com/graphql',
         installationId: 99,
         tokenProvider
       },
@@ -86,6 +86,44 @@ describe('GitHub client error shaping', () => {
         requestLabel: 'POST /graphql'
       });
     }
+  });
+
+  it('uses the explicit graphql url', async () => {
+    const requestedUrls: Array<string> = [];
+    const client = createGitHubGraphQLClient(
+      {
+        graphqlUrl: 'https://example.com/api/graphql',
+        installationId: 99,
+        tokenProvider
+      },
+      {
+        fetch: async (input) => {
+          requestedUrls.push(String(input));
+          return new Response(
+            JSON.stringify({
+              data: {
+                repository: { id: 'repo-1' }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+      }
+    );
+
+    const result = await client.request<{ repository: { id: string } }>({
+      operationName: 'GetRepository',
+      requestLabel: 'POST /graphql',
+      query: 'query GetRepository { repository(name: "demo") { id } }'
+    });
+
+    expect(result.ok).toBe(true);
+    expect(requestedUrls).toEqual(['https://example.com/api/graphql']);
   });
 
   it('returns shaped REST errors without exposing response internals', async () => {

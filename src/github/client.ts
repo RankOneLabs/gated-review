@@ -10,6 +10,7 @@ import type { GitHubFetch } from '#root/src/github/fetch.js';
 export type GitHubClient = Readonly<{
   installationId: number;
   apiBaseUrl: string;
+  graphqlUrl: string;
   graphql: ReturnType<typeof createGitHubGraphQLClient>;
   rest: ReturnType<typeof createGitHubRestClient>;
 }>;
@@ -34,7 +35,7 @@ export function createGitHubClient(
 
   const graphql = createGitHubGraphQLClient(
     {
-      baseUrl: config.apiBaseUrl,
+      graphqlUrl: config.graphqlUrl,
       installationId: config.installationId,
       tokenProvider: tokenCache
     },
@@ -53,6 +54,7 @@ export function createGitHubClient(
   return ok({
     installationId: config.installationId,
     apiBaseUrl: config.apiBaseUrl,
+    graphqlUrl: config.graphqlUrl,
     graphql,
     rest
   });

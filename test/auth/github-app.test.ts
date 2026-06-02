@@ -22,7 +22,8 @@ describe('GitHub app config loading', () => {
         appId: 123,
         installationId: 456,
         privateKey: '-----BEGIN PRIVATE KEY-----\nline-one\n-----END PRIVATE KEY-----',
-        apiBaseUrl: 'https://example.com/api'
+        apiBaseUrl: 'https://example.com/api',
+        graphqlUrl: 'https://api.github.com/graphql'
       });
     }
   });
@@ -43,6 +44,7 @@ describe('GitHub app config loading', () => {
     if (result.ok) {
       expect(result.value.privateKey).toBe(pem);
       expect(result.value.apiBaseUrl).toBe('https://api.github.com');
+      expect(result.value.graphqlUrl).toBe('https://api.github.com/graphql');
     }
   });
 
@@ -116,5 +118,19 @@ describe('GitHub app config loading', () => {
     expect(requestedUrls).toEqual([
       'https://example.com/api/v3/app/installations/456/access_tokens'
     ]);
+  });
+
+  it('loads an explicit graphql url when provided', async () => {
+    const result = await loadGitHubAppConfig({
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_INSTALLATION_ID: '456',
+      GITHUB_APP_PRIVATE_KEY: 'key',
+      GITHUB_GRAPHQL_URL: 'https://example.com/api/graphql'
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.graphqlUrl).toBe('https://example.com/api/graphql');
+    }
   });
 });

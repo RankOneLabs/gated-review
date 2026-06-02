@@ -7,6 +7,7 @@ export type GitHubAppConfig = {
   installationId: number;
   privateKey: string;
   apiBaseUrl: string;
+  graphqlUrl: string;
 };
 
 export type GitHubConfigError =
@@ -71,6 +72,22 @@ function normalizeApiBaseUrl(apiBaseUrl: string | undefined) {
   }
 }
 
+function normalizeGraphqlUrl(graphqlUrl: string | undefined) {
+  if (graphqlUrl === undefined || graphqlUrl.trim() === '') {
+    return ok('https://api.github.com/graphql');
+  }
+
+  try {
+    return ok(new URL(graphqlUrl).toString().replace(/\/$/, ''));
+  } catch {
+    return err<string, GitHubConfigError>({
+      kind: 'invalid_configuration',
+      operation: 'load_github_app_config',
+      detail: 'GITHUB_GRAPHQL_URL must be a valid URL.'
+    });
+  }
+}
+
 async function loadPrivateKey(env: GitHubConfigEnvironment) {
   const inlinePrivateKey = env.GITHUB_APP_PRIVATE_KEY;
   if (inlinePrivateKey !== undefined && inlinePrivateKey.trim() !== '') {
@@ -125,10 +142,16 @@ export async function loadGitHubAppConfig(
     return err<GitHubAppConfig, GitHubConfigError>(apiBaseUrl.error);
   }
 
+  const graphqlUrl = normalizeGraphqlUrl(env.GITHUB_GRAPHQL_URL);
+  if (!graphqlUrl.ok) {
+    return err<GitHubAppConfig, GitHubConfigError>(graphqlUrl.error);
+  }
+
   return ok({
     appId: appId.value,
     installationId: installationId.value,
     privateKey: privateKey.value,
-    apiBaseUrl: apiBaseUrl.value
+    apiBaseUrl: apiBaseUrl.value,
+    graphqlUrl: graphqlUrl.value
   });
 }
