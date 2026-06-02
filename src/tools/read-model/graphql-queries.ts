@@ -62,6 +62,22 @@ export type GraphQLReviewRoundQueryData = Readonly<{
   }> | null;
 }>;
 
+export type GraphQLReviewRoundThreadsQueryData = Readonly<{
+  repository: Readonly<{
+    pullRequest: Readonly<{
+      reviewThreads: GraphQLReviewThreadConnection;
+    } | null>;
+  }> | null;
+}>;
+
+export type GraphQLReviewRoundSummariesQueryData = Readonly<{
+  repository: Readonly<{
+    pullRequest: Readonly<{
+      comments: GraphQLIssueCommentConnection;
+    } | null>;
+  }> | null;
+}>;
+
 export type GraphQLReviewThreadCommentsQueryData = Readonly<{
   node: Readonly<{
     comments: GraphQLReviewCommentConnection;
@@ -112,6 +128,50 @@ export const reviewRoundQuery = `
           }
         }
         comments(first: 100, after: $commentsAfter) {
+          nodes {
+            id
+            body
+            createdAt
+            author {
+              login
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const reviewRoundThreadsQuery = `
+  query ReviewRoundThreadsQuery($owner: String!, $repo: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100, after: $after) {
+          nodes {
+            id
+            isResolved
+            path
+            line
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const reviewRoundSummariesQuery = `
+  query ReviewRoundSummariesQuery($owner: String!, $repo: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        comments(first: 100, after: $after) {
           nodes {
             id
             body
