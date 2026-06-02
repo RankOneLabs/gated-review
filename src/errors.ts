@@ -18,6 +18,13 @@ export type ToolDomainError =
       operation: string;
       entity: ToolEntity;
       detail: string;
+    }
+  | {
+      kind: 'git_command_failed';
+      operation: string;
+      entity: ToolEntity;
+      commandKind: string;
+      detail: string;
     };
 
 export function toolEntity(name: string): ToolEntity {
@@ -47,6 +54,20 @@ export function validationRejectedError(operation: string, detail: string): Tool
     kind: 'validation_rejected',
     operation,
     entity: toolEntity(operation),
+    detail
+  };
+}
+
+export function gitCommandFailedError(
+  operation: string,
+  commandKind: string,
+  detail: string
+): ToolDomainError {
+  return {
+    kind: 'git_command_failed',
+    operation,
+    entity: toolEntity(operation),
+    commandKind,
     detail
   };
 }

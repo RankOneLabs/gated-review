@@ -31,7 +31,11 @@ import {
   requestNextRoundInputSchema,
   requestNextRoundOutputSchema
 } from '#root/src/tools/mutations/request-next-round.js';
+import { gitFetchTool } from '#root/src/tools/git/fetch.js';
+import { gitPullTool } from '#root/src/tools/git/pull.js';
+import { gitPushTool } from '#root/src/tools/git/push.js';
 import type { ToolContract } from '#root/src/tools/types.js';
+import type { ZodTypeAny } from 'zod';
 
 const notImplemented = (toolName: string) => async (_input: unknown) => {
   return err(notImplementedError(toolName));
@@ -39,96 +43,130 @@ const notImplemented = (toolName: string) => async (_input: unknown) => {
 
 export function createToolRegistry(context: ToolExecutionContext) {
   return [
-  {
-    name: 'review.get_state',
-    title: 'Review State',
-    description: 'Read the current gated-review state for a review thread.',
-    actorScopes: ['agent', 'operator', 'event_source'] as const,
-    inputSchemaName: 'review.get_state.input',
-    outputSchemaName: 'review.get_state.output',
-    inputSchema: reviewStateInputSchema,
-    outputSchema: reviewStateOutputSchema,
-    handler: notImplemented('review.get_state')
-  },
-  {
-    name: 'review.list_actions',
-    title: 'Review Actions',
-    description: 'List curated actions that have been taken for a review thread.',
-    actorScopes: ['agent', 'operator'] as const,
-    inputSchemaName: 'review.list_actions.input',
-    outputSchemaName: 'review.list_actions.output',
-    inputSchema: reviewActionsInputSchema,
-    outputSchema: reviewActionsOutputSchema,
-    handler: notImplemented('review.list_actions')
-  },
-  {
-    name: 'review.record_event',
-    title: 'Review Event',
-    description: 'Record a review event from an external source.',
-    actorScopes: ['event_source'] as const,
-    inputSchemaName: 'review.record_event.input',
-    outputSchemaName: 'review.record_event.output',
-    inputSchema: reviewEventInputSchema,
-    outputSchema: reviewEventReceiptOutputSchema,
-    handler: notImplemented('review.record_event')
-  },
-  {
-    name: 'review.apply_decision',
-    title: 'Apply Review Decision',
-    description: 'Apply an operator decision to a gated review.',
-    actorScopes: ['operator'] as const,
-    inputSchemaName: 'review.apply_decision.input',
-    outputSchemaName: 'review.apply_decision.output',
-    inputSchema: reviewDecisionInputSchema,
-    outputSchema: reviewDecisionOutputSchema,
-    handler: notImplemented('review.apply_decision')
-  },
-  {
-    name: 'open_pr',
-    title: 'Open Pull Request',
-    description: 'Open a pull request in the configured repository scope.',
-    actorScopes: ['agent'] as const,
-    inputSchemaName: 'open_pr.input',
-    outputSchemaName: 'open_pr.output',
-    inputSchema: openPrInputSchema,
-    outputSchema: openPrOutputSchema,
-    handler: createOpenPrHandler(context)
-  },
-  {
-    name: 'reply_to_thread',
-    title: 'Reply To Thread',
-    description: 'Reply to a GitHub review thread.',
-    actorScopes: ['agent'] as const,
-    inputSchemaName: 'reply_to_thread.input',
-    outputSchemaName: 'reply_to_thread.output',
-    inputSchema: replyToThreadInputSchema,
-    outputSchema: replyToThreadOutputSchema,
-    handler: createReplyToThreadHandler(context)
-  },
-  {
-    name: 'resolve_thread',
-    title: 'Resolve Thread',
-    description: 'Resolve a GitHub review thread.',
-    actorScopes: ['agent'] as const,
-    inputSchemaName: 'resolve_thread.input',
-    outputSchemaName: 'resolve_thread.output',
-    inputSchema: resolveThreadInputSchema,
-    outputSchema: resolveThreadOutputSchema,
-    handler: createResolveThreadHandler(context)
-  },
-  {
-    name: 'request_next_round',
-    title: 'Request Next Round',
-    description: 'Request another CodeRabbit review round on a pull request.',
-    actorScopes: ['agent'] as const,
-    inputSchemaName: 'request_next_round.input',
-    outputSchemaName: 'request_next_round.output',
-    inputSchema: requestNextRoundInputSchema,
-    outputSchema: requestNextRoundOutputSchema,
-    handler: createRequestNextRoundHandler(context)
-  }
-] as const satisfies readonly ToolContract<import('zod').ZodTypeAny, import('zod').ZodTypeAny>[];
+    {
+      name: 'review.get_state',
+      title: 'Review State',
+      description: 'Read the current gated-review state for a review thread.',
+      actorScopes: ['agent', 'operator', 'event_source'] as const,
+      inputSchemaName: 'review.get_state.input',
+      outputSchemaName: 'review.get_state.output',
+      inputSchema: reviewStateInputSchema,
+      outputSchema: reviewStateOutputSchema,
+      handler: notImplemented('review.get_state')
+    },
+    {
+      name: 'review.list_actions',
+      title: 'Review Actions',
+      description: 'List curated actions that have been taken for a review thread.',
+      actorScopes: ['agent', 'operator'] as const,
+      inputSchemaName: 'review.list_actions.input',
+      outputSchemaName: 'review.list_actions.output',
+      inputSchema: reviewActionsInputSchema,
+      outputSchema: reviewActionsOutputSchema,
+      handler: notImplemented('review.list_actions')
+    },
+    {
+      name: 'review.record_event',
+      title: 'Review Event',
+      description: 'Record a review event from an external source.',
+      actorScopes: ['event_source'] as const,
+      inputSchemaName: 'review.record_event.input',
+      outputSchemaName: 'review.record_event.output',
+      inputSchema: reviewEventInputSchema,
+      outputSchema: reviewEventReceiptOutputSchema,
+      handler: notImplemented('review.record_event')
+    },
+    {
+      name: 'review.apply_decision',
+      title: 'Apply Review Decision',
+      description: 'Apply an operator decision to a gated review.',
+      actorScopes: ['operator'] as const,
+      inputSchemaName: 'review.apply_decision.input',
+      outputSchemaName: 'review.apply_decision.output',
+      inputSchema: reviewDecisionInputSchema,
+      outputSchema: reviewDecisionOutputSchema,
+      handler: notImplemented('review.apply_decision')
+    },
+    {
+      name: 'open_pr',
+      title: 'Open Pull Request',
+      description: 'Open a pull request in the configured repository scope.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'open_pr.input',
+      outputSchemaName: 'open_pr.output',
+      inputSchema: openPrInputSchema,
+      outputSchema: openPrOutputSchema,
+      handler: createOpenPrHandler(context)
+    },
+    {
+      name: 'reply_to_thread',
+      title: 'Reply To Thread',
+      description: 'Reply to a GitHub review thread.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'reply_to_thread.input',
+      outputSchemaName: 'reply_to_thread.output',
+      inputSchema: replyToThreadInputSchema,
+      outputSchema: replyToThreadOutputSchema,
+      handler: createReplyToThreadHandler(context)
+    },
+    {
+      name: 'resolve_thread',
+      title: 'Resolve Thread',
+      description: 'Resolve a GitHub review thread.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'resolve_thread.input',
+      outputSchemaName: 'resolve_thread.output',
+      inputSchema: resolveThreadInputSchema,
+      outputSchema: resolveThreadOutputSchema,
+      handler: createResolveThreadHandler(context)
+    },
+    {
+      name: 'request_next_round',
+      title: 'Request Next Round',
+      description: 'Request another CodeRabbit review round on a pull request.',
+      actorScopes: ['agent'] as const,
+      inputSchemaName: 'request_next_round.input',
+      outputSchemaName: 'request_next_round.output',
+      inputSchema: requestNextRoundInputSchema,
+      outputSchema: requestNextRoundOutputSchema,
+      handler: createRequestNextRoundHandler(context)
+    },
+    {
+      name: 'git.push',
+      title: 'Git Push',
+      description: 'Push the current or requested branch to the origin remote via the MCP server.',
+      actorScopes: ['agent', 'operator'] as const,
+      inputSchemaName: 'git.push.input',
+      outputSchemaName: 'git.push.output',
+      inputSchema: gitPushTool.inputSchema,
+      outputSchema: gitPushTool.outputSchema,
+      handler: gitPushTool.handler
+    },
+    {
+      name: 'git.pull',
+      title: 'Git Pull',
+      description: 'Pull the requested branch from the origin remote via the MCP server.',
+      actorScopes: ['agent', 'operator'] as const,
+      inputSchemaName: 'git.pull.input',
+      outputSchemaName: 'git.pull.output',
+      inputSchema: gitPullTool.inputSchema,
+      outputSchema: gitPullTool.outputSchema,
+      handler: gitPullTool.handler
+    },
+    {
+      name: 'git.fetch',
+      title: 'Git Fetch',
+      description: 'Fetch the requested refspec from the origin remote via the MCP server.',
+      actorScopes: ['agent', 'operator'] as const,
+      inputSchemaName: 'git.fetch.input',
+      outputSchemaName: 'git.fetch.output',
+      inputSchema: gitFetchTool.inputSchema,
+      outputSchema: gitFetchTool.outputSchema,
+      handler: gitFetchTool.handler
+    }
+  ] as const satisfies readonly ToolContract<ZodTypeAny, ZodTypeAny, string>[];
 }
+
 export type ToolName = ReturnType<typeof createToolRegistry>[number]['name'];
 
 export function getToolContract(name: ToolName, context: ToolExecutionContext) {

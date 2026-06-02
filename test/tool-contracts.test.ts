@@ -13,100 +13,82 @@ import {
 import { createGitHubGraphQLClient } from '#root/src/github/graphql.js';
 import { createGitHubRestClient } from '#root/src/github/rest.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
+import type { ToolContract } from '#root/src/tools/types.js';
+import type { ZodTypeAny } from 'zod';
 
-describe('tool contracts', () => {
+function createMockContext() {
   const tokenProvider: GitHubInstallationTokenProvider = {
     async getInstallationToken() {
       return ok('installation-token');
     }
   };
 
-  function createMockContext() {
-    const rest = createGitHubRestClient(
-      {
-        baseUrl: 'https://api.github.com',
-        installationId: 99,
-        tokenProvider
-      },
-      {
-        fetch: async (input, init) => {
-          const url = String(input);
-          if (url.endsWith('/pulls')) {
-            return new Response(
-              JSON.stringify({
-                number: 17,
-                html_url: 'https://github.com/openai/gated-review/pull/17',
-                state: 'open'
-              }),
-              {
-                status: 201,
-                headers: {
-                  'Content-Type': 'application/json'
-                }
+  const rest = createGitHubRestClient(
+    {
+      baseUrl: 'https://api.github.com',
+      installationId: 99,
+      tokenProvider
+    },
+    {
+      fetch: async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/pulls')) {
+          return new Response(
+            JSON.stringify({
+              number: 17,
+              html_url: 'https://github.com/openai/gated-review/pull/17',
+              state: 'open'
+            }),
+            {
+              status: 201,
+              headers: {
+                'Content-Type': 'application/json'
               }
-            );
-          }
-
-          if (url.endsWith('/comments')) {
-            return new Response(
-              JSON.stringify({
-                id: 123,
-                body: JSON.parse(String(init?.body)).body,
-                html_url: 'https://github.com/openai/gated-review/pull/17#issuecomment-123'
-              }),
-              {
-                status: 201,
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-          }
-
-          return new Response(JSON.stringify({}), {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/json'
             }
-          });
+          );
         }
-      }
-    );
-    const graphql = createGitHubGraphQLClient(
-      {
-        graphqlUrl: 'https://api.github.com/graphql',
-        installationId: 99,
-        tokenProvider
-      },
-      {
-        fetch: async (_input, init) => {
-          const request = JSON.parse(String(init?.body));
-          if (request.operationName === 'add_pull_request_review_thread_reply') {
-            return new Response(
-              JSON.stringify({
-                data: {
-                  addPullRequestReviewThreadReply: {
-                    comment: {
-                      id: 'comment-123'
-                    }
-                  }
-                }
-              }),
-              {
-                status: 200,
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-          }
 
+        if (url.endsWith('/comments')) {
+          return new Response(
+            JSON.stringify({
+              id: 123,
+              body: JSON.parse(String(init?.body)).body,
+              html_url: 'https://github.com/openai/gated-review/pull/17#issuecomment-123'
+            }),
+            {
+              status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    }
+  );
+  const graphql = createGitHubGraphQLClient(
+    {
+      graphqlUrl: 'https://api.github.com/graphql',
+      installationId: 99,
+      tokenProvider
+    },
+    {
+      fetch: async (_input, init) => {
+        const request = JSON.parse(String(init?.body));
+        if (request.operationName === 'add_pull_request_review_thread_reply') {
           return new Response(
             JSON.stringify({
               data: {
-                resolveReviewThread: {
-                  thread: {
-                    id: 'thread-123'
+                addPullRequestReviewThreadReply: {
+                  comment: {
+                    id: 'comment-123'
                   }
                 }
               }
@@ -119,21 +101,89 @@ describe('tool contracts', () => {
             }
           );
         }
+
+        return new Response(
+          JSON.stringify({
+            data: {
+              resolveReviewThread: {
+                thread: {
+                  id: 'thread-123'
+                }
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
       }
-    );
+    }
+  );
 
-    return {
-      github: {
-        installationId: 99,
-        apiBaseUrl: 'https://api.github.com',
-        graphqlUrl: 'https://api.github.com/graphql',
-        graphql,
-        rest
-      },
-      repository: { owner: 'openai', repo: 'gated-review' }
-    };
-  }
+  return {
+    github: {
+      installationId: 99,
+      apiBaseUrl: 'https://api.github.com',
+      graphqlUrl: 'https://api.github.com/graphql',
+      graphql,
+      rest
+    },
+    repository: { owner: 'openai', repo: 'gated-review' }
+  };
+}
 
+async function runStubHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
+  const input = tool.inputSchema.parse(
+    tool.name === 'review.record_event'
+      ? {
+          reviewId: 'review-123',
+          event: {
+            eventType: 'sync.completed',
+            payload: { status: 'done' }
+          }
+        }
+      : tool.name === 'review.apply_decision'
+        ? {
+            reviewId: 'review-123',
+            decision: 'approve',
+            reason: 'policy satisfied'
+          }
+        : tool.name === 'open_pr'
+          ? {
+              base: 'main',
+              head: 'feature-branch',
+              title: 'Add feature',
+              body: 'Ship it',
+              draft: true
+            }
+          : tool.name === 'reply_to_thread'
+            ? {
+                threadId: 'thread-123',
+                body: 'Acknowledged'
+              }
+            : tool.name === 'resolve_thread'
+              ? {
+                  threadId: 'thread-123'
+                }
+              : tool.name === 'request_next_round'
+                ? {
+                    pullRequestNumber: 17
+                  }
+                : {
+                    reviewId: 'review-123'
+                  }
+  );
+
+  return {
+    tool,
+    result: await tool.handler(input)
+  };
+}
+
+describe('tool contracts', () => {
   it('exposes a narrow curated tool surface', () => {
     expect(createToolRegistry(createMockContext()).map((tool) => tool.name)).toEqual([
       'review.get_state',
@@ -143,7 +193,10 @@ describe('tool contracts', () => {
       'open_pr',
       'reply_to_thread',
       'resolve_thread',
-      'request_next_round'
+      'request_next_round',
+      'git.push',
+      'git.pull',
+      'git.fetch'
     ]);
     expect(createToolRegistry(createMockContext()).map((tool) => tool.name)).not.toContain('github_raw');
   });
@@ -173,6 +226,18 @@ describe('tool contracts', () => {
     expect(toolRegistry.find((tool) => tool.name === 'request_next_round')?.actorScopes).toEqual([
       'agent'
     ]);
+    expect(toolRegistry.find((tool) => tool.name === 'git.push')?.actorScopes).toEqual([
+      'agent',
+      'operator'
+    ]);
+    expect(toolRegistry.find((tool) => tool.name === 'git.pull')?.actorScopes).toEqual([
+      'agent',
+      'operator'
+    ]);
+    expect(toolRegistry.find((tool) => tool.name === 'git.fetch')?.actorScopes).toEqual([
+      'agent',
+      'operator'
+    ]);
   });
 
   it('keeps the shaped output schema names explicit', () => {
@@ -184,7 +249,10 @@ describe('tool contracts', () => {
       'open_pr.output',
       'reply_to_thread.output',
       'resolve_thread.output',
-      'request_next_round.output'
+      'request_next_round.output',
+      'git.push.output',
+      'git.pull.output',
+      'git.fetch.output'
     ]);
   });
 
@@ -221,72 +289,35 @@ describe('tool contracts', () => {
     expect(decisionReviewId).toBe('review-123');
   });
 
-  it('returns result values with domain errors for every stub handler', async () => {
+  it('returns result values with domain errors for the review stub handlers', async () => {
     const toolRegistry = createToolRegistry(createMockContext());
-    const results = await Promise.all(
-      toolRegistry.map(async (tool) => {
-        const input = tool.inputSchema.parse(
-          tool.name === 'review.record_event'
-            ? {
-                reviewId: 'review-123',
-                event: {
-                  eventType: 'sync.completed',
-                  payload: { status: 'done' }
-                }
-              }
-            : tool.name === 'review.apply_decision'
-              ? {
-                  reviewId: 'review-123',
-                  decision: 'approve',
-                  reason: 'policy satisfied'
-                }
-              : tool.name === 'open_pr'
-                ? {
-                    base: 'main',
-                    head: 'feature-branch',
-                    title: 'Add feature',
-                    body: 'Ship it',
-                    draft: true
-                  }
-                : tool.name === 'reply_to_thread'
-                  ? {
-                      threadId: 'thread-123',
-                      body: 'Acknowledged'
-                    }
-                  : tool.name === 'resolve_thread'
-                    ? {
-                        threadId: 'thread-123'
-                      }
-                    : tool.name === 'request_next_round'
-                      ? {
-                          pullRequestNumber: 17
-                        }
-                      : {
-                          reviewId: 'review-123'
-                        }
-        );
+    const stubTools = toolRegistry.filter((tool) => !tool.name.startsWith('git.')) as readonly ToolContract<
+      ZodTypeAny,
+      ZodTypeAny,
+      string
+    >[];
+    const results = await Promise.all(stubTools.map(async (tool) => runStubHandler(tool)));
 
-        return {
-          tool,
-          result: await tool.handler(input)
-        };
-      })
-    );
-
-    expect(results).toHaveLength(toolRegistry.length);
+    expect(results).toHaveLength(stubTools.length);
     for (const { tool, result } of results) {
-      if (!result.ok) {
-        expect(result.error.kind).toBe('not_implemented');
-        expect(result.error.operation).toMatch(/^review\./);
-        expect(result.error.entity).toEqual({ kind: 'tool', name: result.error.operation });
+      if (tool.name.startsWith('review.')) {
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.kind).toBe('not_implemented');
+          expect(result.error.operation).toMatch(/^review\./);
+          expect(result.error.entity).toEqual({ kind: 'tool', name: result.error.operation });
+        }
       } else if (tool.name === 'open_pr') {
-        expect(result.value).toEqual({
-          number: 17,
-          url: 'https://github.com/openai/gated-review/pull/17',
-          state: 'open'
+        expect(result).toEqual({
+          ok: true,
+          value: {
+            number: 17,
+            url: 'https://github.com/openai/gated-review/pull/17',
+            state: 'open'
+          }
         });
       } else {
-        expect(result.value).toEqual({ ok: true });
+        expect(result).toEqual({ ok: true, value: { ok: true } });
       }
     }
   });
