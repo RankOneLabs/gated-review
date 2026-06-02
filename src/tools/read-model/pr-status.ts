@@ -7,12 +7,11 @@ import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { summarizeChecks } from '#root/src/tools/read-model/checks.js';
 import { prStatusInputSchema } from '#root/src/tools/schemas.js';
 import {
-  prStatusLabelsQuery,
   prStatusQuery,
-  type GraphQLPrStatusLabelsQueryData,
   type GraphQLPrStatusQueryData
 } from '#root/src/tools/read-model/graphql-queries.js';
 import type { PullRequestStatus } from '#root/src/tools/read-model/types.js';
+import { loadMergeReadyState } from '#root/src/tools/operator/merge-ready.js';
 
 export type PrStatusInput = {
   pullRequestNumber: number;
@@ -103,67 +102,6 @@ async function loadOpenThreadCount(
     openThreadCount,
     headRefOid
   });
-}
-
-async function requestMergeReadyPage(
-  context: ToolExecutionContext,
-  pullRequestNumber: number,
-  after: string | null
-): Promise<Result<GraphQLPrStatusLabelsQueryData, ToolDomainError>> {
-  const response = await context.github.graphql.request<GraphQLPrStatusLabelsQueryData>({
-    operationName,
-    requestLabel: graphqlRequestLabel,
-    query: prStatusLabelsQuery,
-    variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
-      number: pullRequestNumber,
-      after
-    }
-  });
-
-  if (!response.ok) {
-    return err(mapGitHubError(response.error));
-  }
-
-  return ok(response.value);
-}
-
-async function loadMergeReadyState(
-  context: ToolExecutionContext,
-  pullRequestNumber: number
-): Promise<Result<boolean, ToolDomainError>> {
-  let labelsAfter: string | null = null;
-
-  while (true) {
-    const page = await requestMergeReadyPage(context, pullRequestNumber, labelsAfter);
-    if (!page.ok) {
-      return page;
-    }
-
-    const pullRequest = page.value.repository?.pullRequest;
-    if (!pullRequest) {
-      return err(
-        githubRequestFailedError(operationName, `Pull request #${pullRequestNumber} was not found.`)
-      );
-    }
-
-    if (pullRequest.labels.nodes.some((label) => label.name.toLowerCase() === 'merge-ready')) {
-      return ok(true);
-    }
-
-    if (!pullRequest.labels.pageInfo.hasNextPage) {
-      return ok(false);
-    }
-
-    if (!pullRequest.labels.pageInfo.endCursor) {
-      return err(
-        githubRequestFailedError(operationName, `Pull request #${pullRequestNumber} returned a missing label cursor.`)
-      );
-    }
-
-    labelsAfter = pullRequest.labels.pageInfo.endCursor;
-  }
 }
 
 export async function getPrStatus(

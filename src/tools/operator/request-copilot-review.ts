@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import { err, ok, type Result } from '#root/src/result.js';
 import { githubError, type ToolDomainError } from '#root/src/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
@@ -7,9 +5,7 @@ import {
   requestCopilotReviewInputSchema,
   requestCopilotReviewOutputSchema
 } from '#root/src/tools/schemas.js';
-
-export type RequestCopilotReviewInput = z.infer<typeof requestCopilotReviewInputSchema>;
-export type RequestCopilotReviewOutput = z.infer<typeof requestCopilotReviewOutputSchema>;
+import type { RequestCopilotReviewOutput } from '#root/src/tools/types.js';
 
 function mapGitHubError(error: { category: string; message: string; requestLabel: string; status?: number }) {
   const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
@@ -24,17 +20,12 @@ export function createRequestCopilotReviewHandler(context: ToolExecutionContext)
     input: unknown
   ): Promise<Result<RequestCopilotReviewOutput, ToolDomainError>> {
     const parsedInput = requestCopilotReviewInputSchema.parse(input);
-    const reviewerLogin = process.env.GITHUB_COPILOT_REVIEWER_LOGIN ?? 'copilot[bot]';
-
-    const result = await context.github.rest.request<unknown>({
-      operationName: 'request_copilot_review',
-      requestLabel: `POST /repos/${context.repository.owner}/${context.repository.repo}/pulls/${parsedInput.pullRequestNumber}/requested_reviewers`,
-      method: 'POST',
-      path: `/repos/${context.repository.owner}/${context.repository.repo}/pulls/${parsedInput.pullRequestNumber}/requested_reviewers`,
-      body: {
-        reviewers: [reviewerLogin]
-      }
-    });
+    const reviewerLogin = (process.env.GITHUB_COPILOT_REVIEWER_LOGIN ?? 'copilot[bot]').trim() || 'copilot[bot]';
+    const result = await context.github.rest.requestPullRequestReviewers(
+      context.repository,
+      parsedInput.pullRequestNumber,
+      [reviewerLogin]
+    );
 
     if (!result.ok) {
       return err(mapGitHubError(result.error));

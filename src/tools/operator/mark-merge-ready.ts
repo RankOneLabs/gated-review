@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import { err, ok, type Result } from '#root/src/result.js';
 import { githubError, type ToolDomainError } from '#root/src/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
@@ -7,9 +5,12 @@ import {
   markMergeReadyInputSchema,
   markMergeReadyOutputSchema
 } from '#root/src/tools/schemas.js';
-
-export type MarkMergeReadyInput = z.infer<typeof markMergeReadyInputSchema>;
-export type MarkMergeReadyOutput = z.infer<typeof markMergeReadyOutputSchema>;
+import {
+  addMergeReadyLabel,
+  loadMergeReadyState,
+  removeMergeReadyLabel
+} from '#root/src/tools/operator/merge-ready.js';
+import type { MarkMergeReadyOutput } from '#root/src/tools/types.js';
 
 function mapGitHubError(error: { category: string; message: string; requestLabel: string; status?: number }) {
   const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
@@ -21,39 +22,23 @@ export function createMarkMergeReadyHandler(context: ToolExecutionContext) {
     input: unknown
   ): Promise<Result<MarkMergeReadyOutput, ToolDomainError>> {
     const parsedInput = markMergeReadyInputSchema.parse(input);
-    const labelName = 'merge-ready';
 
     if (parsedInput.ready) {
-      await context.github.rest.request<unknown>({
-        operationName: 'mark_merge_ready',
-        requestLabel: `GET /repos/${context.repository.owner}/${context.repository.repo}/labels/${labelName}`,
-        method: 'GET',
-        path: `/repos/${context.repository.owner}/${context.repository.repo}/labels/${labelName}`
-      });
-
-      const label = await context.github.rest.request<unknown>({
-        operationName: 'mark_merge_ready',
-        requestLabel: `POST /repos/${context.repository.owner}/${context.repository.repo}/issues/${parsedInput.pullRequestNumber}/labels`,
-        method: 'POST',
-        path: `/repos/${context.repository.owner}/${context.repository.repo}/issues/${parsedInput.pullRequestNumber}/labels`,
-        body: {
-          labels: [labelName]
-        }
-      });
-
+      const label = await addMergeReadyLabel(context, parsedInput.pullRequestNumber);
       if (!label.ok) {
-        return err(mapGitHubError(label.error));
+        return label;
       }
     } else {
-      const label = await context.github.rest.request<unknown>({
-        operationName: 'mark_merge_ready',
-        requestLabel: `DELETE /repos/${context.repository.owner}/${context.repository.repo}/issues/${parsedInput.pullRequestNumber}/labels/${labelName}`,
-        method: 'DELETE',
-        path: `/repos/${context.repository.owner}/${context.repository.repo}/issues/${parsedInput.pullRequestNumber}/labels/${labelName}`
-      });
+      const currentState = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
+      if (!currentState.ok) {
+        return currentState;
+      }
 
-      if (!label.ok) {
-        return err(mapGitHubError(label.error));
+      if (currentState.value) {
+        const label = await removeMergeReadyLabel(context, parsedInput.pullRequestNumber);
+        if (!label.ok) {
+          return label;
+        }
       }
     }
 

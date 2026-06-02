@@ -40,6 +40,9 @@ import {
   requestNextRoundInputSchema,
   requestNextRoundOutputSchema
 } from '#root/src/tools/mutations/request-next-round.js';
+import { createRequestCopilotReviewHandler } from '#root/src/tools/operator/request-copilot-review.js';
+import { createMarkMergeReadyHandler } from '#root/src/tools/operator/mark-merge-ready.js';
+import { createMergePrHandler } from '#root/src/tools/operator/merge-pr.js';
 import type { ToolContract } from '#root/src/tools/types.js';
 import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
 import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
@@ -155,7 +158,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'request_copilot_review.output',
       inputSchema: requestCopilotReviewInputSchema,
       outputSchema: requestCopilotReviewOutputSchema,
-      handler: notImplemented('request_copilot_review')
+      handler: createRequestCopilotReviewHandler(context)
     },
     {
       name: 'mark_merge_ready',
@@ -166,7 +169,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'mark_merge_ready.output',
       inputSchema: markMergeReadyInputSchema,
       outputSchema: markMergeReadyOutputSchema,
-      handler: notImplemented('mark_merge_ready')
+      handler: createMarkMergeReadyHandler(context)
     },
     {
       name: 'merge_pr',
@@ -177,7 +180,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       outputSchemaName: 'merge_pr.output',
       inputSchema: mergePrInputSchema,
       outputSchema: mergePrOutputSchema,
-      handler: notImplemented('merge_pr')
+      handler: createMergePrHandler(context)
     },
     {
       name: 'git.push',

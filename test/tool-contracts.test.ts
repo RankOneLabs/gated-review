@@ -66,6 +66,23 @@ function createMockContext(): ToolExecutionContext {
           );
         }
 
+        if (url.endsWith('/requested_reviewers')) {
+          const body = JSON.parse(String(init?.body));
+          return new Response(
+            JSON.stringify({
+              number: 17,
+              requested_reviewers: (body.reviewers as string[]).map((login) => ({ login })),
+              requested_teams: []
+            }),
+            {
+              status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
         if (url.endsWith('/comments')) {
           return new Response(
             JSON.stringify({
@@ -75,6 +92,73 @@ function createMockContext(): ToolExecutionContext {
             }),
             {
               status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (url.endsWith('/labels/merge-ready') && init?.method === 'GET') {
+          return new Response(JSON.stringify({ message: 'Not Found' }), {
+            status: 404,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+        }
+
+        if (url.endsWith('/labels') && init?.method === 'POST') {
+          const body = JSON.parse(String(init?.body));
+          if (Array.isArray(body.labels)) {
+            return new Response(
+              JSON.stringify(
+                body.labels.map((name: string, index: number) => ({
+                  id: index + 1,
+                  name,
+                  color: 'c2e0c6'
+                }))
+              ),
+              {
+                status: 200,
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              id: 1,
+              name: body.name,
+              color: body.color,
+              description: body.description
+            }),
+            {
+              status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (url.endsWith('/labels/merge-ready') && init?.method === 'DELETE') {
+          return new Response(null, {
+            status: 204
+          });
+        }
+
+        if (url.endsWith('/merge')) {
+          return new Response(
+            JSON.stringify({
+              merged: true,
+              sha: 'merge-sha-123',
+              message: 'Merged'
+            }),
+            {
+              status: 200,
               headers: {
                 'Content-Type': 'application/json'
               }
@@ -766,6 +850,18 @@ describe('tool contracts', () => {
                 { context: 'docs', state: 'pending' }
               ]
             }
+          }
+        });
+      } else if (tool.name === 'request_copilot_review') {
+        expect(result).toEqual({ ok: true, value: { ok: true } });
+      } else if (tool.name === 'mark_merge_ready') {
+        expect(result).toEqual({ ok: true, value: { ok: true } });
+      } else if (tool.name === 'merge_pr') {
+        expect(result).toEqual({
+          ok: true,
+          value: {
+            merged: true,
+            sha: 'merge-sha-123'
           }
         });
       } else {
