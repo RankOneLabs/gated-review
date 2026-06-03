@@ -2,6 +2,7 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { githubRequestFailedError, type ToolDomainError } from '#root/src/errors.js';
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import type { RepositoryRef } from '#root/src/tools/repository-ref.js';
 import { prStatusLabelsQuery, type GraphQLPrStatusLabelsQueryData } from '#root/src/tools/read-model/graphql-queries.js';
 
 export const mergeReadyLabel = 'merge-ready';
@@ -26,6 +27,7 @@ function mapGitHubError(error: GitHubError): ToolDomainError {
 
 async function requestMergeReadyPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number,
   after: string | null
 ): Promise<Result<GraphQLPrStatusLabelsQueryData, ToolDomainError>> {
@@ -34,8 +36,8 @@ async function requestMergeReadyPage(
     requestLabel: 'POST /graphql',
     query: prStatusLabelsQuery,
     variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
+      owner: repository.owner,
+      repo: repository.repo,
       number: pullRequestNumber,
       after
     }
@@ -50,12 +52,13 @@ async function requestMergeReadyPage(
 
 export async function loadMergeReadyState(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number
 ): Promise<Result<boolean, ToolDomainError>> {
   let after: string | null = null;
 
   while (true) {
-    const page = await requestMergeReadyPage(context, pullRequestNumber, after);
+    const page = await requestMergeReadyPage(context, repository, pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -89,13 +92,14 @@ export async function loadMergeReadyState(
 }
 
 async function getMergeReadyLabel(
-  context: ToolExecutionContext
+  context: ToolExecutionContext,
+  repository: RepositoryRef
 ): Promise<Result<GitHubLabelResponse, ToolDomainError>> {
   const response = await context.github.rest.request<GitHubLabelResponse>({
     operationName: 'mark_merge_ready',
-    requestLabel: `GET /repos/${context.repository.owner}/${context.repository.repo}/labels/${mergeReadyLabel}`,
+    requestLabel: `GET /repos/${repository.owner}/${repository.repo}/labels/${mergeReadyLabel}`,
     method: 'GET',
-    path: `/repos/${context.repository.owner}/${context.repository.repo}/labels/${mergeReadyLabel}`
+    path: `/repos/${repository.owner}/${repository.repo}/labels/${mergeReadyLabel}`
   });
 
   if (!response.ok) {
@@ -112,13 +116,14 @@ async function getMergeReadyLabel(
 }
 
 async function createMergeReadyLabel(
-  context: ToolExecutionContext
+  context: ToolExecutionContext,
+  repository: RepositoryRef
 ): Promise<Result<GitHubLabelResponse, ToolDomainError>> {
   const response = await context.github.rest.request<GitHubLabelResponse>({
     operationName: 'mark_merge_ready',
-    requestLabel: `POST /repos/${context.repository.owner}/${context.repository.repo}/labels`,
+    requestLabel: `POST /repos/${repository.owner}/${repository.repo}/labels`,
     method: 'POST',
-    path: `/repos/${context.repository.owner}/${context.repository.repo}/labels`,
+    path: `/repos/${repository.owner}/${repository.repo}/labels`,
     body: {
       name: mergeReadyLabel,
       color: mergeReadyLabelColor,
@@ -134,9 +139,10 @@ async function createMergeReadyLabel(
 }
 
 export async function ensureMergeReadyLabel(
-  context: ToolExecutionContext
+  context: ToolExecutionContext,
+  repository: RepositoryRef
 ): Promise<Result<GitHubLabelResponse, ToolDomainError>> {
-  const existing = await getMergeReadyLabel(context);
+  const existing = await getMergeReadyLabel(context, repository);
   if (existing.ok) {
     return existing;
   }
@@ -146,7 +152,7 @@ export async function ensureMergeReadyLabel(
     existing.error.kind === 'github_request_failed' &&
     existing.error.detail === mergeReadyLabelNotFoundDetail
   ) {
-    return createMergeReadyLabel(context);
+    return createMergeReadyLabel(context, repository);
   }
 
   return existing;
@@ -154,15 +160,16 @@ export async function ensureMergeReadyLabel(
 
 export async function addMergeReadyLabel(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number
 ): Promise<Result<void, ToolDomainError>> {
-  const ensured = await ensureMergeReadyLabel(context);
+  const ensured = await ensureMergeReadyLabel(context, repository);
   if (!ensured.ok) {
     return ensured;
   }
 
   const response = await context.github.rest.addIssueLabels(
-    context.repository,
+    repository,
     pullRequestNumber,
     [mergeReadyLabel]
   );
@@ -175,9 +182,10 @@ export async function addMergeReadyLabel(
 
 export async function removeMergeReadyLabel(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number
 ): Promise<Result<void, ToolDomainError>> {
-  const currentState = await loadMergeReadyState(context, pullRequestNumber);
+  const currentState = await loadMergeReadyState(context, repository, pullRequestNumber);
   if (!currentState.ok) {
     return currentState;
   }
@@ -188,9 +196,9 @@ export async function removeMergeReadyLabel(
 
   const response = await context.github.rest.request<unknown>({
     operationName: 'mark_merge_ready',
-    requestLabel: `DELETE /repos/${context.repository.owner}/${context.repository.repo}/issues/${pullRequestNumber}/labels/${mergeReadyLabel}`,
+    requestLabel: `DELETE /repos/${repository.owner}/${repository.repo}/issues/${pullRequestNumber}/labels/${mergeReadyLabel}`,
     method: 'DELETE',
-    path: `/repos/${context.repository.owner}/${context.repository.repo}/issues/${pullRequestNumber}/labels/${mergeReadyLabel}`
+    path: `/repos/${repository.owner}/${repository.repo}/issues/${pullRequestNumber}/labels/${mergeReadyLabel}`
   });
 
   if (!response.ok) {

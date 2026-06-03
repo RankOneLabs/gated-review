@@ -5,9 +5,11 @@ import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
 import { resolveReviewThread } from '#root/src/tools/mutations/graphql-mutations.js';
+import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
 
 export const resolveThreadInputSchema = z
   .object({
+    repository: z.string().min(1),
     threadId: z.string().min(1)
   })
   .strict()
@@ -33,6 +35,11 @@ export function createResolveThreadHandler(context: ToolExecutionContext) {
     }
 
     const parsedInput = parsed.data;
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('resolve_thread', repoRef.error.detail));
+    }
+
     const result = await resolveReviewThread(context.github.graphql, {
       threadId: parsedInput.threadId
     });

@@ -122,14 +122,11 @@ describe('getPrStatus', () => {
 
     const result = await getPrStatus(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );
@@ -223,14 +220,11 @@ describe('getPrStatus', () => {
 
     const result = await getPrStatus(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );

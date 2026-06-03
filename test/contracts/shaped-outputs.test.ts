@@ -290,7 +290,7 @@ describe('tool shaped outputs', () => {
   it('keeps the registry output payloads shaped for read-model tools', async () => {
     await expectSuccessfulToolOutput(
       'get_review_round',
-      { pullRequestNumber: 42 },
+      { repository: 'openai/gated-review', pullRequestNumber: 42 },
       getReviewRoundOutputSchema,
       {
         pullRequestNumber: 42,
@@ -331,7 +331,7 @@ describe('tool shaped outputs', () => {
 
     await expectSuccessfulToolOutput(
       'pr_status',
-      { pullRequestNumber: 42 },
+      { repository: 'openai/gated-review', pullRequestNumber: 42 },
       prStatusOutputSchema,
       {
         pullRequestNumber: 42,
@@ -360,6 +360,7 @@ describe('tool shaped outputs', () => {
     await expectSuccessfulToolOutput(
       'open_pr',
       {
+        repository: 'openai/gated-review',
         base: 'main',
         head: 'feature-branch',
         title: 'Add feature',
@@ -377,6 +378,7 @@ describe('tool shaped outputs', () => {
     await expectSuccessfulToolOutput(
       'reply_to_thread',
       {
+        repository: 'openai/gated-review',
         threadId: 'thread-1',
         body: 'Acknowledged'
       },
@@ -389,6 +391,7 @@ describe('tool shaped outputs', () => {
     await expectSuccessfulToolOutput(
       'resolve_thread',
       {
+        repository: 'openai/gated-review',
         threadId: 'thread-1'
       },
       resolveThreadOutputSchema,
@@ -400,6 +403,7 @@ describe('tool shaped outputs', () => {
     await expectSuccessfulToolOutput(
       'request_next_round',
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 17
       },
       requestNextRoundOutputSchema,
@@ -411,6 +415,7 @@ describe('tool shaped outputs', () => {
     await expectSuccessfulToolOutput(
       'request_copilot_review',
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 17
       },
       requestCopilotReviewOutputSchema,
@@ -422,6 +427,7 @@ describe('tool shaped outputs', () => {
     await expectSuccessfulToolOutput(
       'mark_merge_ready',
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 17,
         ready: true
       },
@@ -434,6 +440,7 @@ describe('tool shaped outputs', () => {
     await expectSuccessfulToolOutput(
       'merge_pr',
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 17,
         mergeMethod: 'squash',
         commitTitle: 'Merge pull request #17',

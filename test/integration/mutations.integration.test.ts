@@ -237,10 +237,6 @@ function createMockContext() {
         graphql,
         rest
       },
-      repository: {
-        owner: 'openai',
-        repo: 'gated-review'
-      },
       copilotReviewerLogin: 'github-copilot[bot]'
     } satisfies ToolExecutionContext
   };
@@ -261,6 +257,7 @@ describe('mutation integration', () => {
     };
 
     await expect(tool('open_pr').handler({
+      repository: 'openai/gated-review',
       base: 'main',
       head: 'feature-branch',
       title: 'Add feature',
@@ -276,6 +273,7 @@ describe('mutation integration', () => {
     });
 
     await expect(tool('reply_to_thread').handler({
+      repository: 'openai/gated-review',
       threadId: 'thread-123',
       body: 'Acknowledged'
     })).resolves.toEqual({
@@ -286,6 +284,7 @@ describe('mutation integration', () => {
     });
 
     await expect(tool('resolve_thread').handler({
+      repository: 'openai/gated-review',
       threadId: 'thread-123'
     })).resolves.toEqual({
       ok: true,
@@ -295,6 +294,7 @@ describe('mutation integration', () => {
     });
 
     await expect(tool('request_next_round').handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17
     })).resolves.toEqual({
       ok: true,
@@ -304,6 +304,7 @@ describe('mutation integration', () => {
     });
 
     await expect(tool('request_copilot_review').handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17
     })).resolves.toEqual({
       ok: true,
@@ -313,6 +314,7 @@ describe('mutation integration', () => {
     });
 
     await expect(tool('mark_merge_ready').handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       ready: true
     })).resolves.toEqual({
@@ -323,6 +325,7 @@ describe('mutation integration', () => {
     });
 
     await expect(tool('merge_pr').handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       mergeMethod: 'squash',
       commitTitle: 'Merge pull request #17',

@@ -189,14 +189,11 @@ describe('getReviewRound', () => {
 
     const result = await getReviewRound(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );
@@ -265,15 +262,12 @@ describe('getReviewRound', () => {
 
     const result = await getReviewRound(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42,
         includeResolved: true
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );

@@ -73,11 +73,11 @@ describe('request_next_round', () => {
         graphql,
         rest
       },
-      repository: { owner: 'openai', repo: 'gated-review' },
       copilotReviewerLogin: 'github-copilot[bot]'
     });
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17
     });
 

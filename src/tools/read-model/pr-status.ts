@@ -10,6 +10,7 @@ import {
 } from '#root/src/tools/read-model/graphql-queries.js';
 import type { PullRequestStatus } from '#root/src/tools/read-model/types.js';
 import { loadMergeReadyState } from '#root/src/tools/operator/merge-ready.js';
+import { parseRepoSlug, type RepositoryRef } from '#root/src/tools/repository-ref.js';
 
 const operationName = 'pr_status';
 const graphqlRequestLabel = 'POST /graphql';
@@ -32,6 +33,7 @@ function remapToolError(error: ToolDomainError): ToolDomainError {
 
 async function requestPrStatusPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number,
   after: string | null
 ): Promise<Result<GraphQLPrStatusQueryData, ToolDomainError>> {
@@ -40,8 +42,8 @@ async function requestPrStatusPage(
     requestLabel: graphqlRequestLabel,
     query: prStatusQuery,
     variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
+      owner: repository.owner,
+      repo: repository.repo,
       number: pullRequestNumber,
       after
     }
@@ -56,6 +58,7 @@ async function requestPrStatusPage(
 
 async function loadOpenThreadCount(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number
 ): Promise<Result<{ openThreadCount: number; headRefOid: string }, ToolDomainError>> {
   let after: string | null = null;
@@ -63,7 +66,7 @@ async function loadOpenThreadCount(
   let openThreadCount = 0;
 
   while (true) {
-    const page = await requestPrStatusPage(context, pullRequestNumber, after);
+    const page = await requestPrStatusPage(context, repository, pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -116,19 +119,23 @@ export async function getPrStatus(
   }
 
   const parsedInput = parsed.data;
+  const repoRef = parseRepoSlug(parsedInput.repository);
+  if (!repoRef.ok) {
+    return err(validationRejectedError(operationName, repoRef.error.detail));
+  }
 
-  const openThreads = await loadOpenThreadCount(context, parsedInput.pullRequestNumber);
+  const openThreads = await loadOpenThreadCount(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!openThreads.ok) {
     return openThreads;
   }
 
-  const mergeReady = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
+  const mergeReady = await loadMergeReadyState(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!mergeReady.ok) {
     return err(remapToolError(mergeReady.error));
   }
 
   const status = await context.github.rest.getCommitCombinedStatus(
-    context.repository,
+    repoRef.value,
     openThreads.value.headRefOid
   );
   if (!status.ok) {

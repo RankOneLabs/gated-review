@@ -226,10 +226,6 @@ function createMockContext() {
         graphql,
         rest
       },
-      repository: {
-        owner: 'openai',
-        repo: 'gated-review'
-      },
       copilotReviewerLogin: 'github-copilot[bot]'
     } satisfies ToolExecutionContext
   };
@@ -241,6 +237,7 @@ describe('read-model integration', () => {
 
     const result = await getReviewRound(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       context
@@ -299,6 +296,7 @@ describe('read-model integration', () => {
 
     const result = await getPrStatus(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       context

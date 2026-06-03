@@ -72,6 +72,7 @@ describe('mark_merge_ready', () => {
     const handler = createMarkMergeReadyHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       ready: true
     });
@@ -147,6 +148,7 @@ describe('mark_merge_ready', () => {
     const handler = createMarkMergeReadyHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       ready: true
     });
@@ -203,6 +205,7 @@ describe('mark_merge_ready', () => {
     const handler = createMarkMergeReadyHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       ready: false
     });
@@ -270,6 +273,7 @@ describe('mark_merge_ready', () => {
     const handler = createMarkMergeReadyHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       ready: false
     });

@@ -13,6 +13,7 @@ import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js'
 
 export const gitPullInputSchema = z
   .object({
+    repository: z.string().min(1),
     repo_path: z.string().min(1),
     branch: z.string().min(1).optional(),
     rebase: z.boolean().optional()

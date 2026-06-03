@@ -4,10 +4,11 @@ import { validationRejectedError, type ToolDomainError } from '#root/src/errors.
 import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
-import { resolveRepositoryScopeFromContext } from '#root/src/tools/mutations/repository.js';
+import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
 
 export const openPrInputSchema = z
   .object({
+    repository: z.string().min(1),
     base: z.string().min(1),
     head: z.string().min(1),
     title: z.string().min(1),
@@ -37,8 +38,13 @@ export function createOpenPrHandler(context: ToolExecutionContext) {
     }
 
     const parsedInput = parsed.data;
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('open_pr', repoRef.error.detail));
+    }
+
     const result = await context.github.rest.createPullRequest(
-      resolveRepositoryScopeFromContext(context),
+      repoRef.value,
       {
         title: parsedInput.title,
         head: parsedInput.head,
