@@ -345,7 +345,7 @@ export async function getReviewRound(
     return summaries;
   }
 
-  const key = makeRepoPrKey(repoRef.value.owner, repoRef.value.repo, parsedInput.pullRequestNumber);
+  const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
   const prior = context.freshness?.lastDeliveredAt(key) ?? null;
 
   let maxCreatedAt: string | null = null;

@@ -1,8 +1,6 @@
-export type RepoPrKey = string & { readonly __brand: 'RepoPrKey' };
-
-export function makeRepoPrKey(owner: string, repo: string, prNumber: number): RepoPrKey {
-  return `${owner}/${repo}#${prNumber}` as RepoPrKey;
-}
+export type { RepoPrKey } from '#root/src/tools/repository-ref.js';
+export { makeRepoPrKey } from '#root/src/tools/repository-ref.js';
+import type { RepoPrKey } from '#root/src/tools/repository-ref.js';
 
 export type FreshnessStore = {
   lastDeliveredAt(key: RepoPrKey): string | null;
@@ -17,8 +15,10 @@ export function createInMemoryFreshnessStore(): FreshnessStore {
       return map.get(key) ?? null;
     },
     record(key, deliveredAt) {
+      const ms = Date.parse(deliveredAt);
+      if (Number.isNaN(ms)) return;
       const current = map.get(key);
-      if (current === undefined || Date.parse(deliveredAt) > Date.parse(current)) {
+      if (current === undefined || ms > Date.parse(current)) {
         map.set(key, deliveredAt);
       }
     },

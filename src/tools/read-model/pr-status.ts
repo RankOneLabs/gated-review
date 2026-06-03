@@ -135,7 +135,7 @@ export async function getPrStatus(
   }
 
   if ((openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED') && context.freshness) {
-    const key = makeRepoPrKey(repoRef.value.owner, repoRef.value.repo, parsedInput.pullRequestNumber);
+    const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
     context.freshness.purge(key);
   }
 

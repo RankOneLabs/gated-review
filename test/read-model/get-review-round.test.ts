@@ -370,11 +370,12 @@ describe('getReviewRound', () => {
 
     // Confirm watermark was recorded
     const { makeRepoPrKey: mkKey } = await import('#root/src/tools/freshness-store.js');
-    expect(freshness.lastDeliveredAt(mkKey('openai', 'gated-review', 42))).not.toBeNull();
+    const prKey = mkKey({ owner: 'openai', repo: 'gated-review' }, 42);
+    expect(freshness.lastDeliveredAt(prKey)).not.toBeNull();
 
     // Now call with MERGED state — should purge
     await getReviewRound({ repository: 'openai/gated-review', pullRequestNumber: 42 }, context);
-    expect(freshness.lastDeliveredAt(mkKey('openai', 'gated-review', 42))).toBeNull();
+    expect(freshness.lastDeliveredAt(prKey)).toBeNull();
   });
 
   it('crash-after-fetch resurfaces unresolved threads via the unresolved set', async () => {

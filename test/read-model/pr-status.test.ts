@@ -283,7 +283,7 @@ describe('getPrStatus', () => {
 
     for (const prState of ['MERGED', 'CLOSED'] as const) {
       const freshness = createInMemoryFreshnessStore();
-      const key = makeRepoPrKey('openai', 'gated-review', 42);
+      const key = makeRepoPrKey({ owner: 'openai', repo: 'gated-review' }, 42);
       freshness.record(key, '2026-06-01T12:00:00.000Z');
       expect(freshness.lastDeliveredAt(key)).not.toBeNull();
 
