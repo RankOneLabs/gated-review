@@ -24,12 +24,12 @@ describe('createInMemoryFreshnessStore', () => {
     expect(store.lastDeliveredAt(key)).toBe('2026-06-01T13:00:00.000Z');
   });
 
-  it('overwrites with an earlier timestamp when recorded again', () => {
+  it('does not move the watermark backwards when an earlier timestamp is recorded', () => {
     const store = createInMemoryFreshnessStore();
     const key = makeRepoPrKey('owner', 'repo', 1);
     store.record(key, '2026-06-01T13:00:00.000Z');
     store.record(key, '2026-06-01T10:00:00.000Z');
-    expect(store.lastDeliveredAt(key)).toBe('2026-06-01T10:00:00.000Z');
+    expect(store.lastDeliveredAt(key)).toBe('2026-06-01T13:00:00.000Z');
   });
 
   it('returns null after purge', () => {

@@ -17,7 +17,10 @@ export function createInMemoryFreshnessStore(): FreshnessStore {
       return map.get(key) ?? null;
     },
     record(key, deliveredAt) {
-      map.set(key, deliveredAt);
+      const current = map.get(key);
+      if (current === undefined || deliveredAt > current) {
+        map.set(key, deliveredAt);
+      }
     },
     purge(key) {
       map.delete(key);
