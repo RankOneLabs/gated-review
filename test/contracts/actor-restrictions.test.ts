@@ -6,7 +6,7 @@ import { ok } from '#root/src/result.js';
 
 function registeredMcpToolNames(context: ToolExecutionContext): string[] {
   return createToolRegistry(context)
-    .filter((tool) => (tool.actorScopes as readonly string[]).includes('agent'))
+    .filter((tool) => tool.actorScopes.some((scope) => scope === 'agent'))
     .map((tool) => tool.name);
 }
 

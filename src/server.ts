@@ -78,7 +78,7 @@ export function createServer(context: ToolExecutionContext) {
   });
 
   const agentTools = createToolRegistry(context).filter((tool) =>
-    (tool.actorScopes as readonly string[]).includes('agent')
+    tool.actorScopes.some((scope) => scope === 'agent')
   );
 
   const agentToolNames = agentTools.map((tool) => tool.name);
