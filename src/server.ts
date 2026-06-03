@@ -136,7 +136,12 @@ export async function runHttpServer() {
 
       const sessionId = req.headers['mcp-session-id'];
 
-      if (typeof sessionId === 'string' && sessions.has(sessionId)) {
+      if (typeof sessionId === 'string') {
+        if (!sessions.has(sessionId)) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Session not found' }));
+          return;
+        }
         await sessions.get(sessionId)!.handleRequest(req, res);
         return;
       }

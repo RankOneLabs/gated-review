@@ -116,6 +116,7 @@ describe('HTTP MCP server startup', () => {
       });
 
       expect(response.status).toBe(200);
+      await response.body?.cancel();
     } finally {
       await new Promise<void>((resolve, reject) =>
         httpServer.close((err) => (err ? reject(err) : resolve()))
@@ -153,6 +154,8 @@ describe('HTTP MCP server startup', () => {
       expect(r1.status).toBe(200);
       expect(r2.status).toBe(200);
       expect(sessions.size).toBe(2);
+      await r1.body?.cancel();
+      await r2.body?.cancel();
     } finally {
       await new Promise<void>((resolve, reject) =>
         httpServer.close((err) => (err ? reject(err) : resolve()))
