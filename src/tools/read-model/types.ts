@@ -19,6 +19,7 @@ export type ReadModelReviewThread = Readonly<{
   state: ReadModelThreadState;
   path: string | null;
   line: number | null;
+  hasFreshComments: boolean;
   comments: ReadModelThreadComment[];
 }>;
 
@@ -33,6 +34,7 @@ export type ReviewRound = Readonly<{
   pullRequestNumber: number;
   includeResolved: boolean;
   openThreadCount: number;
+  freshSince: string | null;
   threads: ReadModelReviewThread[];
   summaries: ReadModelSummaryComment[];
 }>;

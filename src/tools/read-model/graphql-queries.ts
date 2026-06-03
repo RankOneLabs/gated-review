@@ -61,11 +61,14 @@ export type GraphQLLabelConnection = Readonly<{
   pageInfo: GraphQLPageInfo;
 }>;
 
+export type GraphQLPrState = 'OPEN' | 'CLOSED' | 'MERGED';
+
 export type GraphQLReviewRoundThreadsQueryData = Readonly<{
   repository: Readonly<{
     pullRequest: Readonly<{
+      state: GraphQLPrState;
       reviewThreads: GraphQLReviewThreadConnection;
-    } | null>;
+    }> | null;
   }> | null;
 }>;
 
@@ -86,6 +89,7 @@ export type GraphQLReviewThreadCommentsQueryData = Readonly<{
 export type GraphQLPrStatusQueryData = Readonly<{
   repository: Readonly<{
     pullRequest: Readonly<{
+      state: GraphQLPrState;
       headRefOid: string;
       reviewThreads: Readonly<{
         nodes: ReadonlyArray<Readonly<{ isResolved: boolean }>>;
@@ -107,6 +111,7 @@ export const reviewRoundThreadsQuery = `
   query ReviewRoundThreadsQuery($owner: String!, $repo: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
+        state
         reviewThreads(first: 100, after: $after) {
           nodes {
             id
@@ -174,6 +179,7 @@ export const prStatusQuery = `
   query PrStatusQuery($owner: String!, $repo: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
+        state
         headRefOid
         reviewThreads(first: 100, after: $after) {
           nodes {

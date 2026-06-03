@@ -5,10 +5,12 @@ import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { getReviewRoundInputSchema } from '#root/src/tools/schemas.js';
 import { parseRepoSlug, type RepositoryRef } from '#root/src/tools/repository-ref.js';
 import { tagEntity } from '#root/src/tools/read-model/entity.js';
+import { makeRepoPrKey } from '#root/src/tools/freshness-store.js';
 import {
   reviewRoundSummariesQuery,
   reviewRoundThreadsQuery,
   reviewThreadCommentsQuery,
+  type GraphQLPrState,
   type GraphQLReviewCommentNode,
   type GraphQLReviewRoundIssueCommentNode,
   type GraphQLReviewRoundSummariesQueryData,
@@ -252,6 +254,12 @@ async function loadSummaryComments(
   return ok(summaries);
 }
 
+function isThreadFresh(comments: ReadModelThreadComment[], prior: string | null): boolean {
+  if (prior === null) return true;
+  const priorMs = Date.parse(prior);
+  return comments.some((c) => Date.parse(c.createdAt) > priorMs);
+}
+
 export async function getReviewRound(
   input: unknown,
   context: ToolExecutionContext
@@ -274,6 +282,7 @@ export async function getReviewRound(
     line: number | null;
   }> = [];
   let openThreadCount = 0;
+  let prState: GraphQLPrState | null = null;
   let after: string | null = null;
 
   while (true) {
@@ -287,6 +296,10 @@ export async function getReviewRound(
       return err(
         githubRequestFailedError(operationName, `Pull request #${parsedInput.pullRequestNumber} was not found.`)
       );
+    }
+
+    if (prState === null) {
+      prState = pullRequest.state;
     }
 
     for (const thread of pullRequest.reviewThreads.nodes) {
@@ -332,14 +345,44 @@ export async function getReviewRound(
     return summaries;
   }
 
+  const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
+  const prior = context.freshness?.lastDeliveredAt(key) ?? null;
+
+  let maxCreatedAt: string | null = null;
+  let maxCreatedAtMs = -Infinity;
+  for (const threadComments of comments.value) {
+    for (const comment of threadComments) {
+      const ms = Date.parse(comment.createdAt);
+      if (ms > maxCreatedAtMs) {
+        maxCreatedAtMs = ms;
+        maxCreatedAt = comment.createdAt;
+      }
+    }
+  }
+
+  if (maxCreatedAt !== null && context.freshness) {
+    context.freshness.record(key, maxCreatedAt);
+  }
+
+  if ((prState === 'CLOSED' || prState === 'MERGED') && context.freshness) {
+    context.freshness.purge(key);
+  }
+
   return ok({
     pullRequestNumber: parsedInput.pullRequestNumber,
     includeResolved: parsedInput.includeResolved ?? false,
     openThreadCount,
-    threads: threads.map((thread, index) => ({
-      ...thread,
-      comments: comments.value[index]
-    })),
+    freshSince: prior,
+    threads: threads.map((thread, index) => {
+      const threadComments = comments.value[index];
+      const hasFreshComments =
+        thread.state === 'resolved' ? false : isThreadFresh(threadComments, prior);
+      return {
+        ...thread,
+        hasFreshComments,
+        comments: threadComments
+      };
+    }),
     summaries: summaries.value
   });
 }

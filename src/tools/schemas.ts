@@ -188,6 +188,7 @@ export const readModelReviewThreadSchema = z
     state: readModelThreadStateSchema,
     path: z.string().min(1).nullable(),
     line: z.number().int().nullable(),
+    hasFreshComments: z.boolean(),
     comments: z.array(readModelThreadCommentSchema)
   })
   .strict();
@@ -240,6 +241,7 @@ export const getReviewRoundOutputSchema = z
     pullRequestNumber: z.number().int().positive(),
     includeResolved: z.boolean(),
     openThreadCount: z.number().int().nonnegative(),
+    freshSince: z.string().datetime().nullable(),
     threads: z.array(readModelReviewThreadSchema),
     summaries: z.array(readModelSummaryCommentSchema)
   })

@@ -1,17 +1,20 @@
 import type { GitHubClient } from '#root/src/github/client.js';
 import { loadGitHubAppConfig, type GitHubConfigEnvironment } from '#root/src/config.js';
 import { createGitHubClient } from '#root/src/github/client.js';
+import type { FreshnessStore } from '#root/src/tools/freshness-store.js';
 
 export type ToolExecutionContext = Readonly<{
   github: GitHubClient;
   copilotReviewerLogin: string;
+  freshness?: FreshnessStore;
 }>;
 
 export function createToolExecutionContext(
   github: GitHubClient,
-  copilotReviewerLogin = 'copilot[bot]'
+  copilotReviewerLogin = 'copilot[bot]',
+  freshness?: FreshnessStore
 ): ToolExecutionContext {
-  return { github, copilotReviewerLogin };
+  return { github, copilotReviewerLogin, freshness };
 }
 
 export async function loadToolExecutionContext(

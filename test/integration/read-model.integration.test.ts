@@ -51,6 +51,7 @@ function createMockContext() {
             data: {
               repository: {
                 pullRequest: {
+                  state: 'OPEN',
                   reviewThreads: {
                     nodes: [
                       {
@@ -142,6 +143,7 @@ function createMockContext() {
             data: {
               repository: {
                 pullRequest: {
+                  state: 'OPEN',
                   headRefOid: 'head-sha-123',
                   reviewThreads: {
                     nodes: [
@@ -249,12 +251,14 @@ describe('read-model integration', () => {
         pullRequestNumber: 42,
         includeResolved: false,
         openThreadCount: 1,
+        freshSince: null,
         threads: [
           {
             id: 'thread-open',
             state: 'open',
             path: 'src/open.ts',
             line: 12,
+            hasFreshComments: true,
             comments: [
               {
                 id: 'comment-1',

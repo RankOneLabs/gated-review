@@ -4,8 +4,10 @@ import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { summarizeChecks } from '#root/src/tools/read-model/checks.js';
 import { prStatusInputSchema } from '#root/src/tools/schemas.js';
+import { makeRepoPrKey } from '#root/src/tools/freshness-store.js';
 import {
   prStatusQuery,
+  type GraphQLPrState,
   type GraphQLPrStatusQueryData
 } from '#root/src/tools/read-model/graphql-queries.js';
 import type { PullRequestStatus } from '#root/src/tools/read-model/types.js';
@@ -60,9 +62,10 @@ async function loadOpenThreadCount(
   context: ToolExecutionContext,
   repository: RepositoryRef,
   pullRequestNumber: number
-): Promise<Result<{ openThreadCount: number; headRefOid: string }, ToolDomainError>> {
+): Promise<Result<{ openThreadCount: number; headRefOid: string; prState: GraphQLPrState }, ToolDomainError>> {
   let after: string | null = null;
   let headRefOid: string | null = null;
+  let prState: GraphQLPrState | null = null;
   let openThreadCount = 0;
 
   while (true) {
@@ -79,6 +82,7 @@ async function loadOpenThreadCount(
     }
 
     headRefOid = headRefOid ?? pullRequest.headRefOid;
+    prState = prState ?? pullRequest.state;
 
     for (const thread of pullRequest.reviewThreads.nodes) {
       if (!thread.isResolved) {
@@ -105,7 +109,8 @@ async function loadOpenThreadCount(
 
   return ok({
     openThreadCount,
-    headRefOid
+    headRefOid,
+    prState: prState ?? 'OPEN'
   });
 }
 
@@ -127,6 +132,11 @@ export async function getPrStatus(
   const openThreads = await loadOpenThreadCount(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!openThreads.ok) {
     return openThreads;
+  }
+
+  if ((openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED') && context.freshness) {
+    const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
+    context.freshness.purge(key);
   }
 
   const mergeReady = await loadMergeReadyState(context, repoRef.value, parsedInput.pullRequestNumber);
