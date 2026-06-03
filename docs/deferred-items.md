@@ -9,6 +9,8 @@ These are intentionally out of scope for v1 and are not open questions.
 - `request_next_round` stays optional and policy-driven rather than mandatory.
 - Webhook or orchestrator receive-side resume behavior is outside this MCP server.
 - `MergeReady` auto-clear is deferred to receive-side automation.
+- Review round limits such as `maxReviewRounds: 3` belong to the orchestrator
+  review policy, not this MCP server.
 
 ## Why This Matters
 
