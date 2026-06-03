@@ -7,6 +7,7 @@ import { describeToolError, validationRejectedError } from '#root/src/errors.js'
 import { isOk } from '#root/src/result.js';
 import { createToolRegistry } from '#root/src/tools/registry.js';
 import { createToolExecutionContext, type ToolExecutionContext } from '#root/src/tools/context.js';
+import { createInMemoryFreshnessStore } from '#root/src/tools/freshness-store.js';
 import { reviewDecisionOutputSchema } from '#root/src/tools/schemas.js';
 import type { ZodTypeAny } from 'zod';
 
@@ -116,7 +117,8 @@ export async function runStdioServer() {
 
   const context = createToolExecutionContext(
     githubClientResult.value,
-    configResult.value.copilotReviewerLogin
+    configResult.value.copilotReviewerLogin,
+    createInMemoryFreshnessStore()
   );
   const server = createServer(context);
   await server.connect(new StdioServerTransport());
