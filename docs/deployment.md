@@ -12,9 +12,10 @@ The server speaks **Streamable HTTP MCP** (spec §4). Every MCP interaction goes
 http://willie:3555/mcp
 ```
 
-Clients POST to `/mcp` to initialize a session and then exchange JSON-RPC messages.
-No TLS termination, no reverse proxy — direct port access over the Tailscale tailnet,
-consistent with homelab conventions.
+Clients POST to `/mcp` to initialize a session; the server responds with an
+`mcp-session-id` header. Subsequent requests must include that header — the server
+returns `404 Session not found` without it. No TLS termination, no reverse proxy —
+direct port access over the Tailscale tailnet, consistent with homelab conventions.
 
 ## Willie compose service
 
@@ -152,10 +153,11 @@ await client.connect(transport);
 
 ```sh
 # From any machine on the Tailscale tailnet:
-curl -s http://willie:3555/mcp \
+curl -si http://willie:3555/mcp \
   -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
-# Expect: 200 with a JSON-RPC result and an mcp-session-id header
+# Expect: HTTP 200, mcp-session-id header, and a JSON-RPC result in the body
 
 # Open two separate sessions concurrently to confirm >=2 clients:
 # run the above in two terminal tabs simultaneously

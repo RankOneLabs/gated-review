@@ -1,10 +1,10 @@
-FROM node:22-alpine AS build
+FROM oven/bun:1 AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src/ ./src/
-RUN npm run build
+RUN bun run build
 
 FROM node:22-alpine AS runtime
 WORKDIR /app

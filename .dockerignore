@@ -6,4 +6,3 @@ comms/
 test/
 *.md
 .env*
-bun.lock
