@@ -256,7 +256,8 @@ async function loadSummaryComments(
 
 function isThreadFresh(comments: ReadModelThreadComment[], prior: string | null): boolean {
   if (prior === null) return true;
-  return comments.some((c) => c.createdAt > prior);
+  const priorMs = Date.parse(prior);
+  return comments.some((c) => Date.parse(c.createdAt) > priorMs);
 }
 
 export async function getReviewRound(
@@ -348,9 +349,12 @@ export async function getReviewRound(
   const prior = context.freshness?.lastDeliveredAt(key) ?? null;
 
   let maxCreatedAt: string | null = null;
+  let maxCreatedAtMs = -Infinity;
   for (const threadComments of comments.value) {
     for (const comment of threadComments) {
-      if (maxCreatedAt === null || comment.createdAt > maxCreatedAt) {
+      const ms = Date.parse(comment.createdAt);
+      if (ms > maxCreatedAtMs) {
+        maxCreatedAtMs = ms;
         maxCreatedAt = comment.createdAt;
       }
     }

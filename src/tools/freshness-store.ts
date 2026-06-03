@@ -18,7 +18,7 @@ export function createInMemoryFreshnessStore(): FreshnessStore {
     },
     record(key, deliveredAt) {
       const current = map.get(key);
-      if (current === undefined || deliveredAt > current) {
+      if (current === undefined || Date.parse(deliveredAt) > Date.parse(current)) {
         map.set(key, deliveredAt);
       }
     },
