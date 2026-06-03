@@ -4,6 +4,12 @@ import { createToolRegistry } from '#root/src/tools/registry.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { ok } from '#root/src/result.js';
 
+function registeredMcpToolNames(context: ToolExecutionContext): string[] {
+  return createToolRegistry(context)
+    .filter((tool) => (tool.actorScopes as readonly string[]).includes('agent'))
+    .map((tool) => tool.name);
+}
+
 function createMockContext(): ToolExecutionContext {
   return {
     github: {
@@ -61,6 +67,34 @@ function toolNamesForScope(scope: 'agent' | 'operator' | 'event_source') {
     .filter((tool) => tool.actorScopes.some((actorScope) => actorScope === scope))
     .map((tool) => tool.name);
 }
+
+describe('registered MCP tool surface (agent gate)', () => {
+  it('excludes operator-only verbs from the advertised tool list', () => {
+    const names = registeredMcpToolNames(createMockContext());
+    expect(names).not.toContain('merge_pr');
+    expect(names).not.toContain('mark_merge_ready');
+    expect(names).not.toContain('request_copilot_review');
+    expect(names).not.toContain('review.record_event');
+    expect(names).not.toContain('review.apply_decision');
+  });
+
+  it('includes the expected agent tools in the advertised tool list', () => {
+    const names = registeredMcpToolNames(createMockContext());
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'get_review_round',
+        'open_pr',
+        'reply_to_thread',
+        'resolve_thread',
+        'request_next_round',
+        'pr_status',
+        'git.push',
+        'git.pull',
+        'git.fetch'
+      ])
+    );
+  });
+});
 
 describe('tool actor restrictions', () => {
   it('keeps operator-only tools out of the agent view', () => {
