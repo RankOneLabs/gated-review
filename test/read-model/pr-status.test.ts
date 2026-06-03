@@ -127,10 +127,6 @@ describe('getPrStatus', () => {
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );
@@ -229,10 +225,6 @@ describe('getPrStatus', () => {
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );

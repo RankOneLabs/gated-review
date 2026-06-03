@@ -194,10 +194,6 @@ describe('getReviewRound', () => {
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );
@@ -272,10 +268,6 @@ describe('getReviewRound', () => {
       },
       {
         github,
-        repository: {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
         copilotReviewerLogin: 'github-copilot[bot]'
       }
     );
