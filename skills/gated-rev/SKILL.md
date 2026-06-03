@@ -1,5 +1,5 @@
 ---
-name: gated-pr-review
+name: gated-rev
 description: >
   Fetch, evaluate, and triage PR review comments through the gated-review MCP
   server. Use when the gated-review MCP server is available; routes all PR and
@@ -16,7 +16,8 @@ or the GitHub API directly.
 
 Parse the arguments:
 - `REPO` = first argument (e.g. `acme/my-service`)
-- `PR` = second argument (e.g. `42`)
+- `PR` = second argument as an **integer** (e.g. `42`) — `get_review_round` requires
+  `pullRequestNumber` to be a number, not a string; convert before calling.
 
 ## Hard Boundaries
 
@@ -26,7 +27,7 @@ These are non-negotiable constraints, not preferences:
   never shell out `git push/pull/fetch`, never hit the GitHub API directly.
 - **Remote git operations use `git.push`, `git.pull`, `git.fetch` only.** These route
   credentials server-side.
-- **Merging and mark-ready are human-only.** `merge_pr` and `mark_merge_ready` are
+- **Merging and merge-ready are human-only.** `merge_pr` and `mark_merge_ready` are
   not on the agent tool surface. Never attempt to merge, mark a PR ready, or request
   Copilot review — hand these decisions to the operator.
 - **If new comments appear mid-session, stop and re-triage.** Do not continue acting
