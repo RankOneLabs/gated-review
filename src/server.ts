@@ -77,7 +77,17 @@ export function createServer(context: ToolExecutionContext) {
     version: '0.1.0'
   });
 
-  for (const tool of createToolRegistry(context)) {
+  const agentTools = createToolRegistry(context).filter((tool) =>
+    tool.actorScopes.some((scope) => scope === 'agent')
+  );
+
+  const agentToolNames = agentTools.map((tool) => tool.name);
+  console.info('[gated-review] server.start', {
+    operation: 'server.start',
+    detail: `agent tools: ${agentToolNames.join(', ')}`
+  });
+
+  for (const tool of agentTools) {
     server.registerTool(
       tool.name,
       {
