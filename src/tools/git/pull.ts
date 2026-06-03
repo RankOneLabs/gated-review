@@ -50,7 +50,7 @@ export function createGitPullTool(
   return {
     name: 'git.pull',
     title: 'Git Pull',
-    description: 'Pull a branch from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or gh for remote operations. Requires repository as an owner/name slug.',
+    description: 'Pull a branch from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
     actorScopes: ['agent', 'operator'],
     inputSchemaName: 'git.pull.input',
     outputSchemaName: 'git.pull.output',

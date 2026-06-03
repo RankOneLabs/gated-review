@@ -185,7 +185,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'git.push',
       title: 'Git Push',
-      description: 'Push a branch to origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or gh for remote operations. Requires repository as an owner/name slug.',
+      description: 'Push a branch to origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'operator'] as const,
       inputSchemaName: 'git.push.input',
       outputSchemaName: 'git.push.output',
@@ -196,7 +196,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'git.pull',
       title: 'Git Pull',
-      description: 'Pull a branch from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or gh for remote operations. Requires repository as an owner/name slug.',
+      description: 'Pull a branch from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'operator'] as const,
       inputSchemaName: 'git.pull.input',
       outputSchemaName: 'git.pull.output',
@@ -207,7 +207,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'git.fetch',
       title: 'Git Fetch',
-      description: 'Fetch a refspec from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or gh for remote operations. Requires repository as an owner/name slug.',
+      description: 'Fetch a refspec from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'operator'] as const,
       inputSchemaName: 'git.fetch.input',
       outputSchemaName: 'git.fetch.output',

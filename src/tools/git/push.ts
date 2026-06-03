@@ -49,7 +49,7 @@ export function createGitPushTool(
   return {
     name: 'git.push',
     title: 'Git Push',
-    description: 'Push a branch to origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or gh for remote operations. Requires repository as an owner/name slug.',
+    description: 'Push a branch to origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
     actorScopes: ['agent', 'operator'],
     inputSchemaName: 'git.push.input',
     outputSchemaName: 'git.push.output',
