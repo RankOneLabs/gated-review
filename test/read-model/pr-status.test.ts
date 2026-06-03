@@ -8,6 +8,7 @@ import {
   prStatusLabelsQuery,
   prStatusQuery
 } from '#root/src/tools/read-model/graphql-queries.js';
+import { createInMemoryFreshnessStore, makeRepoPrKey } from '#root/src/tools/freshness-store.js';
 
 function createGitHubClientMock() {
   let threadCallIndex = 0;
@@ -233,6 +234,69 @@ describe('getPrStatus', () => {
     if (!result.ok) {
       expect(result.error.operation).toBe('pr_status');
       expect(result.error.entity).toEqual({ kind: 'tool', name: 'pr_status' });
+    }
+  });
+
+  it('purges the watermark when a terminal PR state (MERGED/CLOSED) is observed', async () => {
+    const makeTerminalMock = (prState: 'MERGED' | 'CLOSED') => {
+      const request = vi.fn(async (requestInput: { query: string }) => {
+        if (requestInput.query === prStatusQuery) {
+          return ok({
+            repository: {
+              pullRequest: {
+                state: prState,
+                headRefOid: 'head-sha-123',
+                reviewThreads: {
+                  nodes: [],
+                  pageInfo: { hasNextPage: false, endCursor: null }
+                }
+              }
+            }
+          });
+        }
+
+        if (requestInput.query === prStatusLabelsQuery) {
+          return ok({
+            repository: {
+              pullRequest: {
+                labels: {
+                  nodes: [],
+                  pageInfo: { hasNextPage: false, endCursor: null }
+                }
+              }
+            }
+          });
+        }
+
+        throw new Error(`Unexpected: ${requestInput.query}`);
+      });
+
+      const rest = {
+        getCommitCombinedStatus: vi.fn(async () => ok({ state: 'success', statuses: [] }))
+      } as unknown as GitHubClient['rest'];
+
+      return {
+        graphql: { request },
+        rest
+      } as unknown as GitHubClient;
+    };
+
+    for (const prState of ['MERGED', 'CLOSED'] as const) {
+      const freshness = createInMemoryFreshnessStore();
+      const key = makeRepoPrKey('openai', 'gated-review', 42);
+      freshness.record(key, '2026-06-01T12:00:00.000Z');
+      expect(freshness.lastDeliveredAt(key)).not.toBeNull();
+
+      await getPrStatus(
+        { repository: 'openai/gated-review', pullRequestNumber: 42 },
+        {
+          github: makeTerminalMock(prState),
+          copilotReviewerLogin: 'github-copilot[bot]',
+          freshness
+        }
+      );
+
+      expect(freshness.lastDeliveredAt(key)).toBeNull();
     }
   });
 });

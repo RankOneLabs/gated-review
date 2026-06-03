@@ -283,6 +283,7 @@ function createMockContext(): ToolExecutionContext {
               data: {
                 repository: {
                   pullRequest: {
+                    state: 'OPEN',
                     reviewThreads: {
                       nodes: [
                         {
@@ -384,6 +385,7 @@ function createMockContext(): ToolExecutionContext {
               data: {
                 repository: {
                   pullRequest: {
+                    state: 'OPEN',
                     headRefOid: 'head-sha-123',
                     reviewThreads: {
                       nodes: [
@@ -585,12 +587,14 @@ describe('tool contracts', () => {
         pullRequestNumber: 42,
         includeResolved: false,
         openThreadCount: 1,
+        freshSince: null,
         threads: [
           {
             id: 'thread-1',
             state: 'open',
             path: 'src/open.ts',
             line: 12,
+            hasFreshComments: true,
             comments: [
               {
                 id: 'comment-1',
@@ -620,12 +624,14 @@ describe('tool contracts', () => {
       pullRequestNumber: 42,
       includeResolved: false,
       openThreadCount: 1,
+      freshSince: null,
       threads: [
         {
           id: 'thread-1',
           state: 'open',
           path: 'src/open.ts',
           line: 12,
+          hasFreshComments: true,
           comments: [
             {
               id: 'comment-1',
@@ -807,12 +813,14 @@ describe('tool contracts', () => {
             pullRequestNumber: 42,
             includeResolved: false,
             openThreadCount: 1,
+            freshSince: null,
             threads: [
               {
                 id: 'thread-open',
                 state: 'open',
                 path: 'src/open.ts',
                 line: 12,
+                hasFreshComments: true,
                 comments: [
                   {
                     id: 'comment-1',
