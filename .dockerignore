@@ -1,0 +1,9 @@
+node_modules/
+dist/
+comms/
+.git/
+.catagents/
+test/
+*.md
+.env*
+bun.lock
