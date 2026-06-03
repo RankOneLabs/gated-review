@@ -8,6 +8,7 @@ export type GitHubAppConfig = {
   privateKey: string;
   apiBaseUrl: string;
   graphqlUrl: string;
+  copilotReviewerLogin: string;
 };
 
 export type GitHubConfigError =
@@ -30,6 +31,8 @@ export type GitHubConfigError =
 export type GitHubConfigEnvironment = Readonly<Record<string, string | undefined>>;
 
 const defaultApiBaseUrl = 'https://api.github.com';
+const defaultGraphqlUrl = 'https://api.github.com/graphql';
+const defaultCopilotReviewerLogin = 'copilot[bot]';
 
 function parsePositiveInteger(value: string | undefined, variableName: string) {
   if (value === undefined || value.trim() === '') {
@@ -56,36 +59,37 @@ function normalizePrivateKey(privateKey: string) {
   return privateKey.replace(/\\n/g, '\n');
 }
 
-function normalizeApiBaseUrl(apiBaseUrl: string | undefined) {
-  if (apiBaseUrl === undefined || apiBaseUrl.trim() === '') {
-    return ok(defaultApiBaseUrl);
+function normalizeUrl(value: string | undefined, fallback: string, variableName: string) {
+  if (value === undefined || value.trim() === '') {
+    return ok(fallback);
   }
 
   try {
-    return ok(new URL(apiBaseUrl).toString().replace(/\/$/, ''));
+    return ok(new URL(value).toString().replace(/\/$/, ''));
   } catch {
     return err<string, GitHubConfigError>({
       kind: 'invalid_configuration',
       operation: 'load_github_app_config',
-      detail: 'GITHUB_API_BASE_URL must be a valid URL.'
+      detail: `${variableName} must be a valid URL.`
     });
   }
 }
 
-function normalizeGraphqlUrl(graphqlUrl: string | undefined) {
-  if (graphqlUrl === undefined || graphqlUrl.trim() === '') {
-    return ok('https://api.github.com/graphql');
+function normalizeCopilotReviewerLogin(value: string | undefined) {
+  if (value === undefined || value.trim() === '') {
+    return ok(defaultCopilotReviewerLogin);
   }
 
-  try {
-    return ok(new URL(graphqlUrl).toString().replace(/\/$/, ''));
-  } catch {
+  const normalized = value.trim();
+  if (normalized.includes('\n') || normalized.includes('\r')) {
     return err<string, GitHubConfigError>({
       kind: 'invalid_configuration',
       operation: 'load_github_app_config',
-      detail: 'GITHUB_GRAPHQL_URL must be a valid URL.'
+      detail: 'GITHUB_COPILOT_REVIEWER_LOGIN must be a single-line login.'
     });
   }
+
+  return ok(normalized);
 }
 
 async function loadPrivateKey(env: GitHubConfigEnvironment) {
@@ -137,14 +141,19 @@ export async function loadGitHubAppConfig(
     return err<GitHubAppConfig, GitHubConfigError>(privateKey.error);
   }
 
-  const apiBaseUrl = normalizeApiBaseUrl(env.GITHUB_API_BASE_URL);
+  const apiBaseUrl = normalizeUrl(env.GITHUB_API_BASE_URL, defaultApiBaseUrl, 'GITHUB_API_BASE_URL');
   if (!apiBaseUrl.ok) {
     return err<GitHubAppConfig, GitHubConfigError>(apiBaseUrl.error);
   }
 
-  const graphqlUrl = normalizeGraphqlUrl(env.GITHUB_GRAPHQL_URL);
+  const graphqlUrl = normalizeUrl(env.GITHUB_GRAPHQL_URL, defaultGraphqlUrl, 'GITHUB_GRAPHQL_URL');
   if (!graphqlUrl.ok) {
     return err<GitHubAppConfig, GitHubConfigError>(graphqlUrl.error);
+  }
+
+  const copilotReviewerLogin = normalizeCopilotReviewerLogin(env.GITHUB_COPILOT_REVIEWER_LOGIN);
+  if (!copilotReviewerLogin.ok) {
+    return err<GitHubAppConfig, GitHubConfigError>(copilotReviewerLogin.error);
   }
 
   return ok({
@@ -152,6 +161,7 @@ export async function loadGitHubAppConfig(
     installationId: installationId.value,
     privateKey: privateKey.value,
     apiBaseUrl: apiBaseUrl.value,
-    graphqlUrl: graphqlUrl.value
+    graphqlUrl: graphqlUrl.value,
+    copilotReviewerLogin: copilotReviewerLogin.value
   });
 }

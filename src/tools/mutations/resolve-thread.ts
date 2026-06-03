@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { githubError, type ToolDomainError } from '#root/src/errors.js';
-import type { GitHubError } from '#root/src/github/errors.js';
+import { validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
 import { resolveReviewThread } from '#root/src/tools/mutations/graphql-mutations.js';
 
 export const resolveThreadInputSchema = z
@@ -23,16 +23,16 @@ export const resolveThreadOutputSchema = z
 export type ResolveThreadInput = z.infer<typeof resolveThreadInputSchema>;
 export type ResolveThreadOutput = z.infer<typeof resolveThreadOutputSchema>;
 
-function mapGitHubError(operation: string, error: GitHubError): ToolDomainError {
-  const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
-  return githubError(operation, `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`);
-}
-
 export function createResolveThreadHandler(context: ToolExecutionContext) {
   return async function resolveThread(
     input: unknown
   ): Promise<Result<ResolveThreadOutput, ToolDomainError>> {
-    const parsedInput = resolveThreadInputSchema.parse(input);
+    const parsed = resolveThreadInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return err(validationRejectedError('resolve_thread', parsed.error.message));
+    }
+
+    const parsedInput = parsed.data;
     const result = await resolveReviewThread(context.github.graphql, {
       threadId: parsedInput.threadId
     });

@@ -14,6 +14,7 @@ type SpawnResponse = Readonly<{
   stderr?: string;
   exitCode?: number;
   throwError?: string;
+  hang?: boolean;
 }>;
 
 function createSpawnMock(responses: SpawnResponse[]) {
@@ -22,6 +23,7 @@ function createSpawnMock(responses: SpawnResponse[]) {
     args: readonly string[];
     options: Parameters<GitSpawn>[2];
   }> = [];
+  const children: ReturnType<GitSpawn>[] = [];
   const spawn: GitSpawn = vi.fn((command, args, options) => {
     calls.push({ command, args, options });
 
@@ -35,6 +37,12 @@ function createSpawnMock(responses: SpawnResponse[]) {
     const stderr = new PassThrough();
     child.stdout = stdout as never;
     child.stderr = stderr as never;
+    child.kill = vi.fn(() => true) as never;
+    children.push(child as ReturnType<GitSpawn>);
+
+    if (response?.hang === true) {
+      return child as ReturnType<GitSpawn>;
+    }
 
     queueMicrotask(() => {
       if (response?.stdout !== undefined) {
@@ -55,7 +63,7 @@ function createSpawnMock(responses: SpawnResponse[]) {
     return child as ReturnType<GitSpawn>;
   });
 
-  return { spawn, calls };
+  return { spawn, calls, children };
 }
 
 function createTokenProvider(token: string): GitHubInstallationTokenProvider {
@@ -218,5 +226,29 @@ describe('git runner', () => {
       expect(result.error.detail).toContain('not an allowed GitHub host');
     }
     expect(tokenProvider).not.toHaveBeenCalled();
+  });
+
+  it('times out stalled git commands and kills the subprocess', async () => {
+    const repoPath = mkdtempSync(join(tmpdir(), 'gated-review-'));
+    const { spawn, children } = createSpawnMock([{ hang: true }]);
+
+    const result = await fetchGitRepository(
+      { repo_path: repoPath },
+      {
+        installationId: 42,
+        tokenProvider: createTokenProvider('token-123'),
+        githubHosts: ['github.com'],
+        spawn,
+        commandTimeoutMs: 1
+      }
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.kind).toBe('validation_rejected');
+      expect(result.error.detail).toContain('timed out');
+    }
+    const child = children[0];
+    expect(child?.kill).toHaveBeenCalledWith('SIGKILL');
   });
 });

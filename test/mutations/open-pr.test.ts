@@ -73,7 +73,8 @@ describe('open_pr', () => {
         graphql,
         rest
       },
-      repository: { owner: 'openai', repo: 'gated-review' }
+      repository: { owner: 'openai', repo: 'gated-review' },
+      copilotReviewerLogin: 'github-copilot[bot]'
     });
 
     const result = await handler({

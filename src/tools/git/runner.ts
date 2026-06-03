@@ -42,7 +42,10 @@ export type GitRunnerDependencies = Readonly<{
   tokenProvider: GitHubInstallationTokenProvider;
   githubHosts: readonly string[];
   spawn?: GitSpawn;
+  commandTimeoutMs?: number;
 }>;
+
+export type GitRunnerDependenciesProvider = () => Promise<Result<GitRunnerDependencies, ToolDomainError>>;
 
 export type GitSpawn = (
   command: string,
@@ -108,11 +111,27 @@ function executeGitCommand(
   spawnImpl: GitSpawn,
   commandKind: GitCommandKind,
   command: string,
-  args: readonly string[]
+  args: readonly string[],
+  timeoutMs = 60_000
 ): Promise<Result<SpawnedCommandResult, ToolDomainError>> {
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
+    let isSettled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (result: Result<SpawnedCommandResult, ToolDomainError>) => {
+      if (isSettled) {
+        return;
+      }
+
+      isSettled = true;
+      if (timeout !== undefined) {
+        clearTimeout(timeout);
+      }
+
+      resolve(result);
+    };
 
     let childProcess: ChildProcessWithoutNullStreams;
     try {
@@ -122,9 +141,14 @@ function executeGitCommand(
       });
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      resolve(err(toCommandError('git.command', commandKind, detail)));
+      finish(err(toCommandError('git.command', commandKind, detail)));
       return;
     }
+
+    timeout = setTimeout(() => {
+      childProcess.kill('SIGKILL');
+      finish(err(toCommandError('git.command', commandKind, `git timed out after ${timeoutMs}ms`)));
+    }, timeoutMs);
 
     childProcess.stdout.setEncoding('utf8');
     childProcess.stderr.setEncoding('utf8');
@@ -136,12 +160,12 @@ function executeGitCommand(
     });
 
     childProcess.once('error', (error: Error) => {
-      resolve(err(toCommandError('git.command', commandKind, error.message)));
+      finish(err(toCommandError('git.command', commandKind, error.message)));
     });
 
     childProcess.once('close', (exitCode) => {
       if (exitCode !== 0) {
-        resolve(
+        finish(
           err(
             toCommandError(
               'git.command',
@@ -153,14 +177,15 @@ function executeGitCommand(
         return;
       }
 
-      resolve(ok({ stdout, stderr, exitCode: exitCode ?? 0 }));
+      finish(ok({ stdout, stderr, exitCode: exitCode ?? 0 }));
     });
   });
 }
 
 async function ensureRepository(
   repoPath: string,
-  spawnImpl: GitSpawn
+  spawnImpl: GitSpawn,
+  commandTimeoutMs?: number
 ): Promise<Result<string, ToolDomainError>> {
   const stats = await statDirectory(repoPath);
   if (!stats.ok) {
@@ -171,7 +196,8 @@ async function ensureRepository(
     spawnImpl,
     'validate_repo_path',
     'git',
-    ['-C', repoPath, 'rev-parse', '--is-inside-work-tree']
+    ['-C', repoPath, 'rev-parse', '--is-inside-work-tree'],
+    commandTimeoutMs
   );
   if (!validation.ok) {
     return err(
@@ -191,13 +217,15 @@ async function ensureRepository(
 
 async function resolveCurrentBranch(
   repoPath: string,
-  spawnImpl: GitSpawn
+  spawnImpl: GitSpawn,
+  commandTimeoutMs?: number
 ): Promise<Result<string, ToolDomainError>> {
   const branchResult = await executeGitCommand(
     spawnImpl,
     'current_branch',
     'git',
-    ['-C', repoPath, 'branch', '--show-current']
+    ['-C', repoPath, 'branch', '--show-current'],
+    commandTimeoutMs
   );
   if (!branchResult.ok) {
     return err(toValidationError('git.branch', branchResult.error.detail));
@@ -219,13 +247,15 @@ async function resolveCurrentBranch(
 async function resolveRemoteHost(
   repoPath: string,
   allowedHosts: readonly string[],
-  spawnImpl: GitSpawn
+  spawnImpl: GitSpawn,
+  commandTimeoutMs?: number
 ): Promise<Result<string, ToolDomainError>> {
   const remoteResult = await executeGitCommand(
     spawnImpl,
     'remote_url',
     'git',
-    ['-C', repoPath, 'remote', 'get-url', 'origin']
+    ['-C', repoPath, 'remote', 'get-url', 'origin'],
+    commandTimeoutMs
   );
   if (!remoteResult.ok) {
     return err(toValidationError('git.remote', remoteResult.error.detail));
@@ -289,7 +319,8 @@ async function runRemoteGitCommand(
   const host = await resolveRemoteHost(
     repoPath,
     dependencies.githubHosts,
-    dependencies.spawn ?? defaultSpawn
+    dependencies.spawn ?? defaultSpawn,
+    dependencies.commandTimeoutMs
   );
   if (!host.ok) {
     return host;
@@ -306,7 +337,8 @@ async function runRemoteGitCommand(
     dependencies.spawn ?? defaultSpawn,
     commandKind,
     'git',
-    args
+    args,
+    dependencies.commandTimeoutMs
   );
   if (!result.ok) {
     const sanitizedDetail = redactGitHubExtraHeader(result.error.detail, token.value);
@@ -320,14 +352,22 @@ export async function pushGitRepository(
   input: GitPushInput,
   dependencies: GitRunnerDependencies
 ): Promise<Result<GitPushOutput, ToolDomainError>> {
-  const repository = await ensureRepository(input.repo_path, dependencies.spawn ?? defaultSpawn);
+  const repository = await ensureRepository(
+    input.repo_path,
+    dependencies.spawn ?? defaultSpawn,
+    dependencies.commandTimeoutMs
+  );
   if (!repository.ok) {
     return repository;
   }
 
   const branchName =
     input.branch === undefined
-      ? await resolveCurrentBranch(input.repo_path, dependencies.spawn ?? defaultSpawn)
+      ? await resolveCurrentBranch(
+          input.repo_path,
+          dependencies.spawn ?? defaultSpawn,
+          dependencies.commandTimeoutMs
+        )
       : validateGitBranchName(input.branch, 'git.push');
   if (!branchName.ok) {
     return branchName;
@@ -357,14 +397,22 @@ export async function pullGitRepository(
   input: GitPullInput,
   dependencies: GitRunnerDependencies
 ): Promise<Result<GitPullOutput, ToolDomainError>> {
-  const repository = await ensureRepository(input.repo_path, dependencies.spawn ?? defaultSpawn);
+  const repository = await ensureRepository(
+    input.repo_path,
+    dependencies.spawn ?? defaultSpawn,
+    dependencies.commandTimeoutMs
+  );
   if (!repository.ok) {
     return repository;
   }
 
   const branchName =
     input.branch === undefined
-      ? await resolveCurrentBranch(input.repo_path, dependencies.spawn ?? defaultSpawn)
+      ? await resolveCurrentBranch(
+          input.repo_path,
+          dependencies.spawn ?? defaultSpawn,
+          dependencies.commandTimeoutMs
+        )
       : validateGitBranchName(input.branch, 'git.pull');
   if (!branchName.ok) {
     return branchName;
@@ -391,7 +439,8 @@ export async function pullGitRepository(
     dependencies.spawn ?? defaultSpawn,
     'head_sha',
     'git',
-    ['-C', input.repo_path, 'rev-parse', 'HEAD']
+    ['-C', input.repo_path, 'rev-parse', 'HEAD'],
+    dependencies.commandTimeoutMs
   );
   if (!headSha.ok) {
     return err(toCommandError('git.pull', 'head_sha', headSha.error.detail));
@@ -409,7 +458,11 @@ export async function fetchGitRepository(
   input: GitFetchInput,
   dependencies: GitRunnerDependencies
 ): Promise<Result<GitFetchOutput, ToolDomainError>> {
-  const repository = await ensureRepository(input.repo_path, dependencies.spawn ?? defaultSpawn);
+  const repository = await ensureRepository(
+    input.repo_path,
+    dependencies.spawn ?? defaultSpawn,
+    dependencies.commandTimeoutMs
+  );
   if (!repository.ok) {
     return repository;
   }

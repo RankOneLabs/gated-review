@@ -1,7 +1,5 @@
-import { z } from 'zod';
-
 import { err, ok, type Result } from '#root/src/result.js';
-import { githubRequestFailedError, type ToolDomainError } from '#root/src/errors.js';
+import { githubRequestFailedError, validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { getReviewRoundInputSchema } from '#root/src/tools/schemas.js';
@@ -17,16 +15,10 @@ import {
   type GraphQLReviewThreadCommentsQueryData
 } from '#root/src/tools/read-model/graphql-queries.js';
 import type {
-  ReadModelReviewThread,
   ReadModelSummaryComment,
   ReadModelThreadComment,
   ReviewRound
 } from '#root/src/tools/read-model/types.js';
-
-export type GetReviewRoundInput = {
-  pullRequestNumber: number;
-  includeResolved?: boolean;
-};
 
 const operationName = 'get_review_round';
 const graphqlRequestLabel = 'POST /graphql';
@@ -121,13 +113,6 @@ async function loadThreadCommentsBatched(
   }
 
   return ok(comments);
-}
-
-async function loadThreadCommentsBatch(
-  context: ToolExecutionContext,
-  threadIds: ReadonlyArray<string>
-): Promise<Result<ReadonlyArray<ReadModelThreadComment[]>, ToolDomainError>> {
-  return loadThreadCommentsBatched(context, threadIds);
 }
 
 async function requestThreadCommentsPage(
@@ -267,7 +252,12 @@ export async function getReviewRound(
   input: unknown,
   context: ToolExecutionContext
 ): Promise<Result<ReviewRound, ToolDomainError>> {
-  const parsedInput = getReviewRoundInputSchema.parse(input);
+  const parsed = getReviewRoundInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return err(validationRejectedError(operationName, parsed.error.message));
+  }
+
+  const parsedInput = parsed.data;
   const threads: Array<{
     id: string;
     state: 'open' | 'resolved';
@@ -320,7 +310,7 @@ export async function getReviewRound(
     after = pullRequest.reviewThreads.pageInfo.endCursor;
   }
 
-  const comments = await loadThreadCommentsBatch(
+  const comments = await loadThreadCommentsBatched(
     context,
     threads.map((thread) => thread.id)
   );

@@ -1,7 +1,5 @@
-import { z } from 'zod';
-
 import { err, ok, type Result } from '#root/src/result.js';
-import { githubRequestFailedError, toolEntity, type ToolDomainError } from '#root/src/errors.js';
+import { githubRequestFailedError, toolEntity, validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { summarizeChecks } from '#root/src/tools/read-model/checks.js';
@@ -12,10 +10,6 @@ import {
 } from '#root/src/tools/read-model/graphql-queries.js';
 import type { PullRequestStatus } from '#root/src/tools/read-model/types.js';
 import { loadMergeReadyState } from '#root/src/tools/operator/merge-ready.js';
-
-export type PrStatusInput = {
-  pullRequestNumber: number;
-};
 
 const operationName = 'pr_status';
 const graphqlRequestLabel = 'POST /graphql';
@@ -116,7 +110,12 @@ export async function getPrStatus(
   input: unknown,
   context: ToolExecutionContext
 ): Promise<Result<PullRequestStatus, ToolDomainError>> {
-  const parsedInput = prStatusInputSchema.parse(input);
+  const parsed = prStatusInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return err(validationRejectedError(operationName, parsed.error.message));
+  }
+
+  const parsedInput = parsed.data;
 
   const openThreads = await loadOpenThreadCount(context, parsedInput.pullRequestNumber);
   if (!openThreads.ok) {

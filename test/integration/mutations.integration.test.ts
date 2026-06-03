@@ -240,7 +240,8 @@ function createMockContext() {
       repository: {
         owner: 'openai',
         repo: 'gated-review'
-      }
+      },
+      copilotReviewerLogin: 'github-copilot[bot]'
     } satisfies ToolExecutionContext
   };
 }
@@ -259,91 +260,81 @@ describe('mutation integration', () => {
       return found;
     };
 
-    const previousReviewer = process.env.GITHUB_COPILOT_REVIEWER_LOGIN;
-    process.env.GITHUB_COPILOT_REVIEWER_LOGIN = 'github-copilot[bot]';
-    try {
-      await expect(tool('open_pr').handler({
-        base: 'main',
-        head: 'feature-branch',
-        title: 'Add feature',
-        body: 'Ship it',
-        draft: true
-      })).resolves.toEqual({
-        ok: true,
-        value: {
-          number: 17,
-          url: 'https://github.com/openai/gated-review/pull/17',
-          state: 'open'
-        }
-      });
-
-      await expect(tool('reply_to_thread').handler({
-        threadId: 'thread-123',
-        body: 'Acknowledged'
-      })).resolves.toEqual({
-        ok: true,
-        value: {
-          ok: true
-        }
-      });
-
-      await expect(tool('resolve_thread').handler({
-        threadId: 'thread-123'
-      })).resolves.toEqual({
-        ok: true,
-        value: {
-          ok: true
-        }
-      });
-
-      await expect(tool('request_next_round').handler({
-        pullRequestNumber: 17
-      })).resolves.toEqual({
-        ok: true,
-        value: {
-          ok: true
-        }
-      });
-
-      await expect(tool('request_copilot_review').handler({
-        pullRequestNumber: 17
-      })).resolves.toEqual({
-        ok: true,
-        value: {
-          ok: true
-        }
-      });
-
-      await expect(tool('mark_merge_ready').handler({
-        pullRequestNumber: 17,
-        ready: true
-      })).resolves.toEqual({
-        ok: true,
-        value: {
-          ok: true
-        }
-      });
-
-      await expect(tool('merge_pr').handler({
-        pullRequestNumber: 17,
-        mergeMethod: 'squash',
-        commitTitle: 'Merge pull request #17',
-        commitMessage: 'Gate satisfied',
-        sha: 'head-sha-123'
-      })).resolves.toEqual({
-        ok: true,
-        value: {
-          merged: true,
-          sha: 'merge-sha-123'
-        }
-      });
-    } finally {
-      if (previousReviewer === undefined) {
-        delete process.env.GITHUB_COPILOT_REVIEWER_LOGIN;
-      } else {
-        process.env.GITHUB_COPILOT_REVIEWER_LOGIN = previousReviewer;
+    await expect(tool('open_pr').handler({
+      base: 'main',
+      head: 'feature-branch',
+      title: 'Add feature',
+      body: 'Ship it',
+      draft: true
+    })).resolves.toEqual({
+      ok: true,
+      value: {
+        number: 17,
+        url: 'https://github.com/openai/gated-review/pull/17',
+        state: 'open'
       }
-    }
+    });
+
+    await expect(tool('reply_to_thread').handler({
+      threadId: 'thread-123',
+      body: 'Acknowledged'
+    })).resolves.toEqual({
+      ok: true,
+      value: {
+        ok: true
+      }
+    });
+
+    await expect(tool('resolve_thread').handler({
+      threadId: 'thread-123'
+    })).resolves.toEqual({
+      ok: true,
+      value: {
+        ok: true
+      }
+    });
+
+    await expect(tool('request_next_round').handler({
+      pullRequestNumber: 17
+    })).resolves.toEqual({
+      ok: true,
+      value: {
+        ok: true
+      }
+    });
+
+    await expect(tool('request_copilot_review').handler({
+      pullRequestNumber: 17
+    })).resolves.toEqual({
+      ok: true,
+      value: {
+        ok: true
+      }
+    });
+
+    await expect(tool('mark_merge_ready').handler({
+      pullRequestNumber: 17,
+      ready: true
+    })).resolves.toEqual({
+      ok: true,
+      value: {
+        ok: true
+      }
+    });
+
+    await expect(tool('merge_pr').handler({
+      pullRequestNumber: 17,
+      mergeMethod: 'squash',
+      commitTitle: 'Merge pull request #17',
+      commitMessage: 'Gate satisfied',
+      sha: 'head-sha-123'
+    })).resolves.toEqual({
+      ok: true,
+      value: {
+        merged: true,
+        sha: 'merge-sha-123'
+      }
+    });
 
     expect(
       requests

@@ -2,6 +2,7 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { createGitHubError, type GitHubError } from '#root/src/github/errors.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { GitHubFetch } from '#root/src/github/fetch.js';
+import { readGitHubErrorMessage } from '#root/src/github/response-error.js';
 
 export type GitHubGraphQLPrimitive = string | number | boolean | null;
 export type GitHubGraphQLValue = GitHubGraphQLPrimitive | ReadonlyArray<unknown> | Readonly<Record<string, unknown>>;
@@ -50,22 +51,6 @@ function extractGraphQLErrorMessage(response: GitHubGraphQLResponse<unknown>) {
   }
 
   return firstError.message || 'GitHub GraphQL request failed.';
-}
-
-async function readErrorResponseMessage(response: Response) {
-  try {
-    const body = (await response.json()) as unknown;
-    if (typeof body === 'object' && body !== null) {
-      const message = (body as Record<string, unknown>).message;
-      if (typeof message === 'string' && message.trim() !== '') {
-        return message;
-      }
-    }
-  } catch {
-    // Fall back to the HTTP status text below.
-  }
-
-  return response.statusText || 'GitHub rejected the request.';
 }
 
 export function createGitHubGraphQLClient(
@@ -118,7 +103,7 @@ export function createGitHubGraphQLClient(
             operation: request.operationName,
             requestLabel: request.requestLabel,
             status: response.status,
-            message: await readErrorResponseMessage(response)
+            message: await readGitHubErrorMessage(response)
           })
         );
       }

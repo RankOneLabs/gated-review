@@ -34,6 +34,60 @@ import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache
 import type { ToolContract } from '#root/src/tools/types.js';
 import type { ZodTypeAny } from 'zod';
 
+const defaultInputFixture = { reviewId: 'review-123' };
+
+const inputFixtures: Readonly<Record<string, unknown>> = {
+  'review.record_event': {
+    reviewId: 'review-123',
+    event: {
+      eventType: 'sync.completed',
+      payload: { status: 'done' }
+    }
+  },
+  'review.apply_decision': {
+    reviewId: 'review-123',
+    decision: 'approve',
+    reason: 'policy satisfied'
+  },
+  open_pr: {
+    base: 'main',
+    head: 'feature-branch',
+    title: 'Add feature',
+    body: 'Ship it',
+    draft: true
+  },
+  reply_to_thread: {
+    threadId: 'thread-123',
+    body: 'Acknowledged'
+  },
+  resolve_thread: {
+    threadId: 'thread-123'
+  },
+  request_next_round: {
+    pullRequestNumber: 17
+  },
+  request_copilot_review: {
+    pullRequestNumber: 42
+  },
+  mark_merge_ready: {
+    pullRequestNumber: 42,
+    ready: true
+  },
+  merge_pr: {
+    pullRequestNumber: 42,
+    mergeMethod: 'squash',
+    commitTitle: 'Merge pull request #42',
+    commitMessage: 'Gate satisfied',
+    sha: 'head-sha-123'
+  },
+  get_review_round: {
+    pullRequestNumber: 42
+  },
+  pr_status: {
+    pullRequestNumber: 42
+  }
+};
+
 function createMockContext(): ToolExecutionContext {
   const tokenProvider: GitHubInstallationTokenProvider = {
     async getInstallationToken() {
@@ -400,71 +454,13 @@ function createMockContext(): ToolExecutionContext {
       graphql,
       rest
     },
-    repository: { owner: 'openai', repo: 'gated-review' }
+    repository: { owner: 'openai', repo: 'gated-review' },
+    copilotReviewerLogin: 'github-copilot[bot]'
   };
 }
 
 async function runStubHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
-  const input = tool.inputSchema.parse(
-    tool.name === 'review.record_event'
-      ? {
-          reviewId: 'review-123',
-          event: {
-            eventType: 'sync.completed',
-            payload: { status: 'done' }
-          }
-        }
-      : tool.name === 'review.apply_decision'
-        ? {
-            reviewId: 'review-123',
-            decision: 'approve',
-            reason: 'policy satisfied'
-          }
-        : tool.name === 'open_pr'
-          ? {
-              base: 'main',
-              head: 'feature-branch',
-              title: 'Add feature',
-              body: 'Ship it',
-              draft: true
-            }
-          : tool.name === 'reply_to_thread'
-            ? {
-                threadId: 'thread-123',
-                body: 'Acknowledged'
-              }
-            : tool.name === 'resolve_thread'
-              ? {
-                  threadId: 'thread-123'
-                }
-                : tool.name === 'request_next_round'
-                  ? {
-                      pullRequestNumber: 17
-                    }
-                  : tool.name === 'request_copilot_review' ||
-                      tool.name === 'mark_merge_ready' ||
-                      tool.name === 'merge_pr'
-                    ? {
-                        pullRequestNumber: 42,
-                        ...(tool.name === 'mark_merge_ready'
-                          ? { ready: true }
-                          : tool.name === 'merge_pr'
-                            ? {
-                                mergeMethod: 'squash' as const,
-                                commitTitle: 'Merge pull request #42',
-                                commitMessage: 'Gate satisfied',
-                                sha: 'head-sha-123'
-                              }
-                            : {})
-                      }
-                  : tool.name === 'get_review_round' || tool.name === 'pr_status'
-                    ? {
-                        pullRequestNumber: 42
-                    }
-                  : {
-                      reviewId: 'review-123'
-                    }
-  );
+  const input = tool.inputSchema.parse(inputFixtures[tool.name] ?? defaultInputFixture);
 
   return {
     tool,

@@ -23,7 +23,8 @@ describe('GitHub app config loading', () => {
         installationId: 456,
         privateKey: '-----BEGIN PRIVATE KEY-----\nline-one\n-----END PRIVATE KEY-----',
         apiBaseUrl: 'https://example.com/api',
-        graphqlUrl: 'https://api.github.com/graphql'
+        graphqlUrl: 'https://api.github.com/graphql',
+        copilotReviewerLogin: 'copilot[bot]'
       });
     }
   });
@@ -45,6 +46,7 @@ describe('GitHub app config loading', () => {
       expect(result.value.privateKey).toBe(pem);
       expect(result.value.apiBaseUrl).toBe('https://api.github.com');
       expect(result.value.graphqlUrl).toBe('https://api.github.com/graphql');
+      expect(result.value.copilotReviewerLogin).toBe('copilot[bot]');
     }
   });
 
@@ -131,6 +133,20 @@ describe('GitHub app config loading', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.graphqlUrl).toBe('https://example.com/api/graphql');
+    }
+  });
+
+  it('loads an explicit Copilot reviewer login when provided', async () => {
+    const result = await loadGitHubAppConfig({
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_INSTALLATION_ID: '456',
+      GITHUB_APP_PRIVATE_KEY: 'key',
+      GITHUB_COPILOT_REVIEWER_LOGIN: ' github-copilot[bot] '
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.copilotReviewerLogin).toBe('github-copilot[bot]');
     }
   });
 });

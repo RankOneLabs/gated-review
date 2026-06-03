@@ -110,7 +110,11 @@ export async function runStdioServer() {
     throw new Error(repositoryResult.error.detail);
   }
 
-  const context = createToolExecutionContext(githubClientResult.value, repositoryResult.value);
+  const context = createToolExecutionContext(
+    githubClientResult.value,
+    repositoryResult.value,
+    configResult.value.copilotReviewerLogin
+  );
   const server = createServer(context);
   await server.connect(new StdioServerTransport());
 }

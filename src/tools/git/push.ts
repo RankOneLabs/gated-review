@@ -7,7 +7,7 @@ import {
   pushGitRepository,
   type GitPushInput,
   type GitPushOutput,
-  type GitRunnerDependencies
+  type GitRunnerDependenciesProvider
 } from '#root/src/tools/git/runner.js';
 import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js';
 
@@ -29,8 +29,6 @@ export const gitPushOutputSchema = z
 
 export type GitPushContractInput = z.infer<typeof gitPushInputSchema>;
 export type GitPushContractOutput = z.infer<typeof gitPushOutputSchema>;
-
-export type GitRunnerDependenciesProvider = () => Promise<Result<GitRunnerDependencies, ToolDomainError>>;
 
 async function runGitPush(
   input: GitPushInput,

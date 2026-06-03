@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { githubError, type ToolDomainError } from '#root/src/errors.js';
-import type { GitHubError } from '#root/src/github/errors.js';
+import { validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
 
 export const requestNextRoundInputSchema = z
   .object({
@@ -22,16 +22,16 @@ export const requestNextRoundOutputSchema = z
 export type RequestNextRoundInput = z.infer<typeof requestNextRoundInputSchema>;
 export type RequestNextRoundOutput = z.infer<typeof requestNextRoundOutputSchema>;
 
-function mapGitHubError(operation: string, error: GitHubError): ToolDomainError {
-  const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
-  return githubError(operation, `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`);
-}
-
 export function createRequestNextRoundHandler(context: ToolExecutionContext) {
   return async function requestNextRound(
     input: unknown
   ): Promise<Result<RequestNextRoundOutput, ToolDomainError>> {
-    const parsedInput = requestNextRoundInputSchema.parse(input);
+    const parsed = requestNextRoundInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return err(validationRejectedError('request_next_round', parsed.error.message));
+    }
+
+    const parsedInput = parsed.data;
     const result = await context.github.rest.createIssueComment(
       context.repository,
       parsedInput.pullRequestNumber,

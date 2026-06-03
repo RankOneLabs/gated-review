@@ -93,15 +93,17 @@ function parseGitHubRemoteUrl(remoteUrl: string): Result<GitHubRepositoryScope, 
   }
 
   return ok({
-    owner: segments[0] ?? '',
-    repo: segments[1] ?? ''
+    owner: segments[0].trim(),
+    repo: segments[1].trim()
   });
 }
 
-export async function resolveRepositoryScope(): Promise<
+export async function resolveRepositoryScope(
+  env: Readonly<Record<string, string | undefined>> = process.env
+): Promise<
   Result<GitHubRepositoryScope, RepositoryResolutionError>
 > {
-  const configuredRepository = process.env.GITHUB_REPOSITORY;
+  const configuredRepository = env.GITHUB_REPOSITORY;
   if (configuredRepository !== undefined) {
     return parseRepositorySlug(configuredRepository);
   }

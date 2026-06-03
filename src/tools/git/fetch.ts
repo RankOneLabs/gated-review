@@ -7,7 +7,7 @@ import {
   fetchGitRepository,
   type GitFetchInput,
   type GitFetchOutput,
-  type GitRunnerDependencies
+  type GitRunnerDependenciesProvider
 } from '#root/src/tools/git/runner.js';
 import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js';
 
@@ -28,8 +28,6 @@ export const gitFetchOutputSchema = z
 
 export type GitFetchContractInput = z.infer<typeof gitFetchInputSchema>;
 export type GitFetchContractOutput = z.infer<typeof gitFetchOutputSchema>;
-
-export type GitRunnerDependenciesProvider = () => Promise<Result<GitRunnerDependencies, ToolDomainError>>;
 
 async function runGitFetch(
   input: GitFetchInput,

@@ -1,5 +1,5 @@
 import { err, ok, type Result } from '#root/src/result.js';
-import { githubError, type ToolDomainError } from '#root/src/errors.js';
+import { githubError, validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { requestCopilotReviewInputSchema } from '#root/src/tools/schemas.js';
 import type { RequestCopilotReviewOutput } from '#root/src/tools/types.js';
@@ -16,12 +16,16 @@ export function createRequestCopilotReviewHandler(context: ToolExecutionContext)
   return async function requestCopilotReview(
     input: unknown
   ): Promise<Result<RequestCopilotReviewOutput, ToolDomainError>> {
-    const parsedInput = requestCopilotReviewInputSchema.parse(input);
-    const reviewerLogin = (process.env.GITHUB_COPILOT_REVIEWER_LOGIN ?? 'copilot[bot]').trim() || 'copilot[bot]';
+    const parsed = requestCopilotReviewInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return err(validationRejectedError('request_copilot_review', parsed.error.message));
+    }
+
+    const parsedInput = parsed.data;
     const result = await context.github.rest.requestPullRequestReviewers(
       context.repository,
       parsedInput.pullRequestNumber,
-      [reviewerLogin]
+      [context.copilotReviewerLogin]
     );
 
     if (!result.ok) {

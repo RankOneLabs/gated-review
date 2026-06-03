@@ -1,14 +1,9 @@
 import { err, ok, type Result } from '#root/src/result.js';
-import { githubError, toolEntity, type ToolDomainError } from '#root/src/errors.js';
+import { validationRejectedError, toolEntity, type ToolDomainError } from '#root/src/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { markMergeReadyInputSchema } from '#root/src/tools/schemas.js';
 import { addMergeReadyLabel, removeMergeReadyLabel } from '#root/src/tools/operator/merge-ready.js';
 import type { MarkMergeReadyOutput } from '#root/src/tools/types.js';
-
-function mapGitHubError(error: { category: string; message: string; requestLabel: string; status?: number }) {
-  const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
-  return githubError('mark_merge_ready', `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`);
-}
 
 function remapToolError(error: ToolDomainError): ToolDomainError {
   return {
@@ -22,7 +17,12 @@ export function createMarkMergeReadyHandler(context: ToolExecutionContext) {
   return async function markMergeReady(
     input: unknown
   ): Promise<Result<MarkMergeReadyOutput, ToolDomainError>> {
-    const parsedInput = markMergeReadyInputSchema.parse(input);
+    const parsed = markMergeReadyInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return err(validationRejectedError('mark_merge_ready', parsed.error.message));
+    }
+
+    const parsedInput = parsed.data;
 
     if (parsedInput.ready) {
       const label = await addMergeReadyLabel(context, parsedInput.pullRequestNumber);

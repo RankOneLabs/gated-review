@@ -7,7 +7,7 @@ import {
   pullGitRepository,
   type GitPullInput,
   type GitPullOutput,
-  type GitRunnerDependencies
+  type GitRunnerDependenciesProvider
 } from '#root/src/tools/git/runner.js';
 import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js';
 
@@ -30,8 +30,6 @@ export const gitPullOutputSchema = z
 
 export type GitPullContractInput = z.infer<typeof gitPullInputSchema>;
 export type GitPullContractOutput = z.infer<typeof gitPullOutputSchema>;
-
-export type GitRunnerDependenciesProvider = () => Promise<Result<GitRunnerDependencies, ToolDomainError>>;
 
 async function runGitPull(
   input: GitPullInput,

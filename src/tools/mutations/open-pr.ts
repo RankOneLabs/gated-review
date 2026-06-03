@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { githubError, type ToolDomainError } from '#root/src/errors.js';
-import type { GitHubError } from '#root/src/github/errors.js';
+import { validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
+import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
 import { resolveRepositoryScopeFromContext } from '#root/src/tools/mutations/repository.js';
 
 export const openPrInputSchema = z
@@ -29,14 +29,14 @@ export const openPrOutputSchema = z
 export type OpenPrInput = z.infer<typeof openPrInputSchema>;
 export type OpenPrOutput = z.infer<typeof openPrOutputSchema>;
 
-function mapGitHubError(operation: string, error: GitHubError): ToolDomainError {
-  const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
-  return githubError(operation, `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`);
-}
-
 export function createOpenPrHandler(context: ToolExecutionContext) {
   return async function openPr(input: unknown): Promise<Result<OpenPrOutput, ToolDomainError>> {
-    const parsedInput = openPrInputSchema.parse(input);
+    const parsed = openPrInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return err(validationRejectedError('open_pr', parsed.error.message));
+    }
+
+    const parsedInput = parsed.data;
     const result = await context.github.rest.createPullRequest(
       resolveRepositoryScopeFromContext(context),
       {

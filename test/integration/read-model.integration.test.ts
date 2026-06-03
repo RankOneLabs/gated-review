@@ -229,7 +229,8 @@ function createMockContext() {
       repository: {
         owner: 'openai',
         repo: 'gated-review'
-      }
+      },
+      copilotReviewerLogin: 'github-copilot[bot]'
     } satisfies ToolExecutionContext
   };
 }

@@ -151,12 +151,13 @@ export function createGitHubAppAuth(
           body: '{}'
         });
       } catch (error: unknown) {
+        const detail = error instanceof Error ? error.message : String(error);
         return err(
           createGitHubError({
             category: 'transport',
             operation: 'mint_installation_token',
             requestLabel,
-            message: 'GitHub token request failed.'
+            message: `GitHub token request failed: ${detail}`
           })
         );
       }

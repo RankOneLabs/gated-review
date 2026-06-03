@@ -27,7 +27,12 @@ function remapToolError(error: ToolDomainError): ToolDomainError {
 
 export function createMergePrHandler(context: ToolExecutionContext) {
   return async function mergePr(input: unknown): Promise<Result<MergePrOutput, ToolDomainError>> {
-    const parsedInput = mergePrInputSchema.parse(input);
+    const parsed = mergePrInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return err(validationRejectedError('merge_pr', parsed.error.message));
+    }
+
+    const parsedInput = parsed.data;
     const mergeReady = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
     if (!mergeReady.ok) {
       return err(remapToolError(mergeReady.error));

@@ -23,32 +23,23 @@ describe('request_copilot_review', () => {
       repository: {
         owner: 'openai',
         repo: 'gated-review'
-      }
+      },
+      copilotReviewerLogin: 'github-copilot[bot]'
     } as unknown as ToolExecutionContext;
     const handler = createRequestCopilotReviewHandler(context);
 
-    const previousReviewer = process.env.GITHUB_COPILOT_REVIEWER_LOGIN;
-    process.env.GITHUB_COPILOT_REVIEWER_LOGIN = 'github-copilot[bot]';
-    try {
-      const result = await handler({
-        pullRequestNumber: 17
-      });
+    const result = await handler({
+      pullRequestNumber: 17
+    });
 
-      expect(result).toEqual({ ok: true, value: { ok: true } });
-      expect(requestPullRequestReviewers).toHaveBeenCalledWith(
-        {
-          owner: 'openai',
-          repo: 'gated-review'
-        },
-        17,
-        ['github-copilot[bot]']
-      );
-    } finally {
-      if (previousReviewer === undefined) {
-        delete process.env.GITHUB_COPILOT_REVIEWER_LOGIN;
-      } else {
-        process.env.GITHUB_COPILOT_REVIEWER_LOGIN = previousReviewer;
-      }
-    }
+    expect(result).toEqual({ ok: true, value: { ok: true } });
+    expect(requestPullRequestReviewers).toHaveBeenCalledWith(
+      {
+        owner: 'openai',
+        repo: 'gated-review'
+      },
+      17,
+      ['github-copilot[bot]']
+    );
   });
 });

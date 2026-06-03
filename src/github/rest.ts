@@ -2,6 +2,7 @@ import { err, ok, type Result } from '#root/src/result.js';
 import { createGitHubError, type GitHubError } from '#root/src/github/errors.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { GitHubFetch } from '#root/src/github/fetch.js';
+import { readGitHubErrorMessage } from '#root/src/github/response-error.js';
 import { resolveGitHubUrl } from '#root/src/github/url.js';
 
 export type GitHubRestMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -78,22 +79,6 @@ function buildRepositoryPath(repository: GitHubRepositoryScope, suffix: string) 
   return `/repos/${repository.owner}/${repository.repo}/${suffix}`;
 }
 
-async function readErrorMessage(response: Response) {
-  try {
-    const body = (await response.json()) as unknown;
-    if (typeof body === 'object' && body !== null) {
-      const message = (body as Record<string, unknown>).message;
-      if (typeof message === 'string' && message.trim() !== '') {
-        return message;
-      }
-    }
-  } catch {
-    // Fall through to the HTTP status text.
-  }
-
-  return response.statusText || 'GitHub rejected the request.';
-}
-
 export function createGitHubRestClient(
   options: GitHubRestClientOptions,
   dependencies: GitHubRestClientDependencies = {}
@@ -137,7 +122,7 @@ export function createGitHubRestClient(
           operation: input.operationName,
           requestLabel: input.requestLabel,
           status: response.status,
-          message: await readErrorMessage(response)
+            message: await readGitHubErrorMessage(response)
         })
       );
     }

@@ -256,7 +256,8 @@ function createMockContext(): ToolExecutionContext {
     repository: {
       owner: 'openai',
       repo: 'gated-review'
-    }
+    },
+    copilotReviewerLogin: 'github-copilot[bot]'
   } as ToolExecutionContext;
 }
 
