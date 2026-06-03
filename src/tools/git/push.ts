@@ -49,7 +49,7 @@ export function createGitPushTool(
   return {
     name: 'git.push',
     title: 'Git Push',
-    description: 'Push the current or requested branch to the origin remote via the MCP server.',
+    description: 'Push a branch to origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or gh for remote operations. Requires repository as an owner/name slug.',
     actorScopes: ['agent', 'operator'],
     inputSchemaName: 'git.push.input',
     outputSchemaName: 'git.push.output',

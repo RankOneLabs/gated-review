@@ -48,7 +48,7 @@ export function createGitFetchTool(
   return {
     name: 'git.fetch',
     title: 'Git Fetch',
-    description: 'Fetch the requested refspec from the origin remote via the MCP server.',
+    description: 'Fetch a refspec from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or gh for remote operations. Requires repository as an owner/name slug.',
     actorScopes: ['agent', 'operator'],
     inputSchemaName: 'git.fetch.input',
     outputSchemaName: 'git.fetch.output',
