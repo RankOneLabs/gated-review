@@ -9,9 +9,11 @@ Bounded MCP server for agent-driven GitHub PR reviews, with enforced triage and 
 
 ## Docs
 
+- [Agent workflow](docs/agent-workflow.md)
 - [Configuration](docs/configuration.md)
 - [GitHub App permissions](docs/github-app-permissions.md)
 - [Local development](docs/local-development.md)
+- [Review policy](docs/review-policy.md)
 - [Deferred items](docs/deferred-items.md)
 
 ## Build And Run
