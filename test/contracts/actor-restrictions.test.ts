@@ -52,7 +52,7 @@ function createMockContext(): ToolExecutionContext {
       owner: 'openai',
       repo: 'gated-review'
     }
-  } as ToolExecutionContext;
+  } as unknown as ToolExecutionContext;
 }
 
 function toolNamesForScope(scope: 'agent' | 'operator' | 'event_source') {
