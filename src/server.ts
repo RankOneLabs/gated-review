@@ -1,5 +1,8 @@
+import { createServer as createHttpServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { createGitHubClient } from '#root/src/github/client.js';
 import { loadGitHubAppConfig } from '#root/src/config.js';
@@ -104,7 +107,7 @@ export function createServer(context: ToolExecutionContext) {
   return server;
 }
 
-export async function runStdioServer() {
+export async function runHttpServer() {
   const configResult = await loadGitHubAppConfig();
   if (!configResult.ok) {
     throw new Error(configResult.error.detail);
@@ -120,6 +123,64 @@ export async function runStdioServer() {
     configResult.value.copilotReviewerLogin,
     createInMemoryFreshnessStore()
   );
-  const server = createServer(context);
-  await server.connect(new StdioServerTransport());
+
+  const sessions = new Map<string, StreamableHTTPServerTransport>();
+
+  const httpServer = createHttpServer(async (req, res) => {
+    try {
+      if (req.url !== '/mcp') {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+
+      const sessionId = req.headers['mcp-session-id'];
+
+      if (typeof sessionId === 'string') {
+        if (!sessions.has(sessionId)) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Session not found' }));
+          return;
+        }
+        await sessions.get(sessionId)!.handleRequest(req, res);
+        return;
+      }
+
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (id) => {
+          sessions.set(id, transport);
+        },
+        onsessionclosed: (id) => {
+          sessions.delete(id);
+        }
+      });
+
+      const server = createServer(context);
+      await server.connect(transport);
+      await transport.handleRequest(req, res);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[gated-review] request error', { detail: message });
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
+    }
+  });
+
+  const { httpPort } = configResult.value;
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once('error', reject);
+    httpServer.listen(httpPort, () => {
+      console.info('[gated-review] server.listen', {
+        operation: 'server.listen',
+        detail: `HTTP MCP server listening on port ${httpPort}`
+      });
+      resolve();
+    });
+  });
+
+  return httpServer;
 }

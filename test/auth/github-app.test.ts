@@ -13,7 +13,8 @@ describe('GitHub app config loading', () => {
       GITHUB_APP_ID: '123',
       GITHUB_APP_INSTALLATION_ID: '456',
       GITHUB_APP_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nline-one\\n-----END PRIVATE KEY-----',
-      GITHUB_API_BASE_URL: 'https://example.com/api'
+      GITHUB_API_BASE_URL: 'https://example.com/api',
+      GATED_REVIEW_HTTP_PORT: '3000'
     });
 
     expect(result.ok).toBe(true);
@@ -24,7 +25,8 @@ describe('GitHub app config loading', () => {
         privateKey: '-----BEGIN PRIVATE KEY-----\nline-one\n-----END PRIVATE KEY-----',
         apiBaseUrl: 'https://example.com/api',
         graphqlUrl: 'https://api.github.com/graphql',
-        copilotReviewerLogin: 'copilot[bot]'
+        copilotReviewerLogin: 'copilot[bot]',
+        httpPort: 3000
       });
     }
   });
@@ -38,7 +40,8 @@ describe('GitHub app config loading', () => {
     const result = await loadGitHubAppConfig({
       GITHUB_APP_ID: '123',
       GITHUB_APP_INSTALLATION_ID: '456',
-      GITHUB_APP_PRIVATE_KEY_PATH: keyPath
+      GITHUB_APP_PRIVATE_KEY_PATH: keyPath,
+      GATED_REVIEW_HTTP_PORT: '3000'
     });
 
     expect(result.ok).toBe(true);
@@ -47,6 +50,7 @@ describe('GitHub app config loading', () => {
       expect(result.value.apiBaseUrl).toBe('https://api.github.com');
       expect(result.value.graphqlUrl).toBe('https://api.github.com/graphql');
       expect(result.value.copilotReviewerLogin).toBe('copilot[bot]');
+      expect(result.value.httpPort).toBe(3000);
     }
   });
 
@@ -85,7 +89,8 @@ describe('GitHub app config loading', () => {
       GITHUB_APP_ID: '123',
       GITHUB_APP_INSTALLATION_ID: '456',
       GITHUB_APP_PRIVATE_KEY: pem,
-      GITHUB_API_BASE_URL: 'https://example.com/api/v3'
+      GITHUB_API_BASE_URL: 'https://example.com/api/v3',
+      GATED_REVIEW_HTTP_PORT: '3000'
     });
 
     expect(result.ok).toBe(true);
@@ -127,7 +132,8 @@ describe('GitHub app config loading', () => {
       GITHUB_APP_ID: '123',
       GITHUB_APP_INSTALLATION_ID: '456',
       GITHUB_APP_PRIVATE_KEY: 'key',
-      GITHUB_GRAPHQL_URL: 'https://example.com/api/graphql'
+      GITHUB_GRAPHQL_URL: 'https://example.com/api/graphql',
+      GATED_REVIEW_HTTP_PORT: '3000'
     });
 
     expect(result.ok).toBe(true);
@@ -141,7 +147,8 @@ describe('GitHub app config loading', () => {
       GITHUB_APP_ID: '123',
       GITHUB_APP_INSTALLATION_ID: '456',
       GITHUB_APP_PRIVATE_KEY: 'key',
-      GITHUB_COPILOT_REVIEWER_LOGIN: ' github-copilot[bot] '
+      GITHUB_COPILOT_REVIEWER_LOGIN: ' github-copilot[bot] ',
+      GATED_REVIEW_HTTP_PORT: '3000'
     });
 
     expect(result.ok).toBe(true);
