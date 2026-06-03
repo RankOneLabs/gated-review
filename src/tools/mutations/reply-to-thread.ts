@@ -8,6 +8,7 @@ import {
   addPullRequestReviewThreadReply,
   type AddPullRequestReviewThreadReplyInput
 } from '#root/src/tools/mutations/graphql-mutations.js';
+import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
 
 export const replyToThreadInputSchema = z
   .object({
@@ -38,6 +39,11 @@ export function createReplyToThreadHandler(context: ToolExecutionContext) {
     }
 
     const parsedInput = parsed.data;
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('reply_to_thread', repoRef.error.detail));
+    }
+
     const result = await addPullRequestReviewThreadReply(context.github.graphql, {
       threadId: parsedInput.threadId,
       body: parsedInput.body
