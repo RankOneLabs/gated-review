@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { err, ok, type Result } from '#root/src/result.js';
-import { githubRequestFailedError, type ToolDomainError } from '#root/src/errors.js';
+import { githubRequestFailedError, toolEntity, type ToolDomainError } from '#root/src/errors.js';
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { summarizeChecks } from '#root/src/tools/read-model/checks.js';
@@ -26,6 +26,14 @@ function mapGitHubError(error: GitHubError): ToolDomainError {
     operationName,
     `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`
   );
+}
+
+function remapToolError(error: ToolDomainError): ToolDomainError {
+  return {
+    ...error,
+    operation: operationName,
+    entity: toolEntity(operationName)
+  };
 }
 
 async function requestPrStatusPage(
@@ -117,7 +125,7 @@ export async function getPrStatus(
 
   const mergeReady = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
   if (!mergeReady.ok) {
-    return mergeReady;
+    return err(remapToolError(mergeReady.error));
   }
 
   const status = await context.github.rest.getCommitCombinedStatus(

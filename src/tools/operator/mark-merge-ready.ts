@@ -1,5 +1,5 @@
 import { err, ok, type Result } from '#root/src/result.js';
-import { githubError, type ToolDomainError } from '#root/src/errors.js';
+import { githubError, toolEntity, type ToolDomainError } from '#root/src/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import {
   markMergeReadyInputSchema,
@@ -17,6 +17,14 @@ function mapGitHubError(error: { category: string; message: string; requestLabel
   return githubError('mark_merge_ready', `${error.category}: ${error.message} (${error.requestLabel}${statusSuffix})`);
 }
 
+function remapToolError(error: ToolDomainError): ToolDomainError {
+  return {
+    ...error,
+    operation: 'mark_merge_ready',
+    entity: toolEntity('mark_merge_ready')
+  };
+}
+
 export function createMarkMergeReadyHandler(context: ToolExecutionContext) {
   return async function markMergeReady(
     input: unknown
@@ -26,18 +34,18 @@ export function createMarkMergeReadyHandler(context: ToolExecutionContext) {
     if (parsedInput.ready) {
       const label = await addMergeReadyLabel(context, parsedInput.pullRequestNumber);
       if (!label.ok) {
-        return label;
+        return err(remapToolError(label.error));
       }
     } else {
       const currentState = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
       if (!currentState.ok) {
-        return currentState;
+        return err(remapToolError(currentState.error));
       }
 
       if (currentState.value) {
         const label = await removeMergeReadyLabel(context, parsedInput.pullRequestNumber);
         if (!label.ok) {
-          return label;
+          return err(remapToolError(label.error));
         }
       }
     }
