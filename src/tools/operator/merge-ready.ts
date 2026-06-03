@@ -7,6 +7,7 @@ import { prStatusLabelsQuery, type GraphQLPrStatusLabelsQueryData } from '#root/
 export const mergeReadyLabel = 'merge-ready';
 export const mergeReadyLabelColor = 'c2e0c6';
 export const mergeReadyLabelDescription = 'Ready to merge.';
+export const mergeReadyLabelNotFoundDetail = `GitHub label ${mergeReadyLabel} was not found on the repository.`;
 
 type GitHubLabelResponse = Readonly<{
   id: number;
@@ -100,10 +101,7 @@ async function getMergeReadyLabel(
   if (!response.ok) {
     if (response.error.status === 404) {
       return err(
-        githubRequestFailedError(
-          'mark_merge_ready',
-          `GitHub label ${mergeReadyLabel} was not found on the repository.`
-        )
+        githubRequestFailedError('mark_merge_ready', mergeReadyLabelNotFoundDetail)
       );
     }
 
@@ -143,7 +141,11 @@ export async function ensureMergeReadyLabel(
     return existing;
   }
 
-  if (existing.error.detail.includes(`${mergeReadyLabel} was not found`)) {
+  if (
+    existing.error.operation === 'mark_merge_ready' &&
+    existing.error.kind === 'github_request_failed' &&
+    existing.error.detail === mergeReadyLabelNotFoundDetail
+  ) {
     return createMergeReadyLabel(context);
   }
 
