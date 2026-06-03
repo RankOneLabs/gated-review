@@ -128,6 +128,12 @@ export async function runHttpServer() {
 
   const httpServer = createHttpServer(async (req, res) => {
     try {
+      if (req.url !== '/mcp') {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+
       const sessionId = req.headers['mcp-session-id'];
 
       if (typeof sessionId === 'string' && sessions.has(sessionId)) {
