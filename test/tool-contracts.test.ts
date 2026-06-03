@@ -8,8 +8,14 @@ import { createToolRegistry } from '#root/src/tools/registry.js';
 import {
   getReviewRoundInputSchema,
   getReviewRoundOutputSchema,
+  markMergeReadyInputSchema,
+  markMergeReadyOutputSchema,
+  mergePrInputSchema,
+  mergePrOutputSchema,
   prStatusInputSchema,
   prStatusOutputSchema,
+  requestCopilotReviewInputSchema,
+  requestCopilotReviewOutputSchema,
   reviewActionSchema,
   reviewDecisionInputSchema,
   reviewEventReceiptOutputSchema,
@@ -60,6 +66,23 @@ function createMockContext(): ToolExecutionContext {
           );
         }
 
+        if (url.endsWith('/requested_reviewers')) {
+          const body = JSON.parse(String(init?.body));
+          return new Response(
+            JSON.stringify({
+              number: 17,
+              requested_reviewers: (body.reviewers as string[]).map((login) => ({ login })),
+              requested_teams: []
+            }),
+            {
+              status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
         if (url.endsWith('/comments')) {
           return new Response(
             JSON.stringify({
@@ -69,6 +92,73 @@ function createMockContext(): ToolExecutionContext {
             }),
             {
               status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (url.endsWith('/labels/merge-ready') && init?.method === 'GET') {
+          return new Response(JSON.stringify({ message: 'Not Found' }), {
+            status: 404,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+        }
+
+        if (url.endsWith('/labels') && init?.method === 'POST') {
+          const body = JSON.parse(String(init?.body));
+          if (Array.isArray(body.labels)) {
+            return new Response(
+              JSON.stringify(
+                body.labels.map((name: string, index: number) => ({
+                  id: index + 1,
+                  name,
+                  color: 'c2e0c6'
+                }))
+              ),
+              {
+                status: 200,
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              id: 1,
+              name: body.name,
+              color: body.color,
+              description: body.description
+            }),
+            {
+              status: 201,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (url.endsWith('/labels/merge-ready') && init?.method === 'DELETE') {
+          return new Response(null, {
+            status: 204
+          });
+        }
+
+        if (url.endsWith('/merge')) {
+          return new Response(
+            JSON.stringify({
+              merged: true,
+              sha: 'merge-sha-123',
+              message: 'Merged'
+            }),
+            {
+              status: 200,
               headers: {
                 'Content-Type': 'application/json'
               }
@@ -347,13 +437,29 @@ async function runStubHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>
               ? {
                   threadId: 'thread-123'
                 }
-              : tool.name === 'request_next_round'
-                ? {
-                    pullRequestNumber: 17
-                  }
-                : tool.name === 'get_review_round' || tool.name === 'pr_status'
+                : tool.name === 'request_next_round'
                   ? {
-                      pullRequestNumber: 42
+                      pullRequestNumber: 17
+                    }
+                  : tool.name === 'request_copilot_review' ||
+                      tool.name === 'mark_merge_ready' ||
+                      tool.name === 'merge_pr'
+                    ? {
+                        pullRequestNumber: 42,
+                        ...(tool.name === 'mark_merge_ready'
+                          ? { ready: true }
+                          : tool.name === 'merge_pr'
+                            ? {
+                                mergeMethod: 'squash' as const,
+                                commitTitle: 'Merge pull request #42',
+                                commitMessage: 'Gate satisfied',
+                                sha: 'head-sha-123'
+                              }
+                            : {})
+                      }
+                  : tool.name === 'get_review_round' || tool.name === 'pr_status'
+                    ? {
+                        pullRequestNumber: 42
                     }
                   : {
                       reviewId: 'review-123'
@@ -377,6 +483,9 @@ describe('tool contracts', () => {
       'reply_to_thread',
       'resolve_thread',
       'request_next_round',
+      'request_copilot_review',
+      'mark_merge_ready',
+      'merge_pr',
       'git.push',
       'git.pull',
       'git.fetch',
@@ -411,6 +520,13 @@ describe('tool contracts', () => {
     expect(toolRegistry.find((tool) => tool.name === 'request_next_round')?.actorScopes).toEqual([
       'agent'
     ]);
+    expect(toolRegistry.find((tool) => tool.name === 'request_copilot_review')?.actorScopes).toEqual([
+      'operator'
+    ]);
+    expect(toolRegistry.find((tool) => tool.name === 'mark_merge_ready')?.actorScopes).toEqual([
+      'operator'
+    ]);
+    expect(toolRegistry.find((tool) => tool.name === 'merge_pr')?.actorScopes).toEqual(['operator']);
     expect(toolRegistry.find((tool) => tool.name === 'git.push')?.actorScopes).toEqual([
       'agent',
       'operator'
@@ -444,6 +560,9 @@ describe('tool contracts', () => {
       'reply_to_thread.output',
       'resolve_thread.output',
       'request_next_round.output',
+      'request_copilot_review.output',
+      'mark_merge_ready.output',
+      'merge_pr.output',
       'git.push.output',
       'git.pull.output',
       'git.fetch.output',
@@ -563,6 +682,44 @@ describe('tool contracts', () => {
         pendingCount: 0,
         contexts: [{ context: 'lint', state: 'success' }]
       }
+    });
+  });
+
+  it('keeps the operator tool schemas shaped for merge control', () => {
+    expect(requestCopilotReviewInputSchema.parse({ pullRequestNumber: 42 })).toEqual({
+      pullRequestNumber: 42
+    });
+    expect(requestCopilotReviewOutputSchema.parse({ ok: true })).toEqual({ ok: true });
+
+    expect(
+      markMergeReadyInputSchema.parse({
+        pullRequestNumber: 42,
+        ready: true
+      })
+    ).toEqual({
+      pullRequestNumber: 42,
+      ready: true
+    });
+    expect(markMergeReadyOutputSchema.parse({ ok: true })).toEqual({ ok: true });
+
+    expect(
+      mergePrInputSchema.parse({
+        pullRequestNumber: 42,
+        mergeMethod: 'squash',
+        commitTitle: 'Merge pull request #42',
+        commitMessage: 'Gate satisfied',
+        sha: 'head-sha-123'
+      })
+    ).toEqual({
+      pullRequestNumber: 42,
+      mergeMethod: 'squash',
+      commitTitle: 'Merge pull request #42',
+      commitMessage: 'Gate satisfied',
+      sha: 'head-sha-123'
+    });
+    expect(mergePrOutputSchema.parse({ merged: true, sha: 'merge-sha-123' })).toEqual({
+      merged: true,
+      sha: 'merge-sha-123'
     });
   });
 
@@ -693,6 +850,18 @@ describe('tool contracts', () => {
                 { context: 'docs', state: 'pending' }
               ]
             }
+          }
+        });
+      } else if (tool.name === 'request_copilot_review') {
+        expect(result).toEqual({ ok: true, value: { ok: true } });
+      } else if (tool.name === 'mark_merge_ready') {
+        expect(result).toEqual({ ok: true, value: { ok: true } });
+      } else if (tool.name === 'merge_pr') {
+        expect(result).toEqual({
+          ok: true,
+          value: {
+            merged: true,
+            sha: 'merge-sha-123'
           }
         });
       } else {

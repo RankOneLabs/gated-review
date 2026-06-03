@@ -40,9 +40,20 @@ import {
   requestNextRoundInputSchema,
   requestNextRoundOutputSchema
 } from '#root/src/tools/mutations/request-next-round.js';
+import { createRequestCopilotReviewHandler } from '#root/src/tools/operator/request-copilot-review.js';
+import { createMarkMergeReadyHandler } from '#root/src/tools/operator/mark-merge-ready.js';
+import { createMergePrHandler } from '#root/src/tools/operator/merge-pr.js';
 import type { ToolContract } from '#root/src/tools/types.js';
 import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
 import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
+import {
+  markMergeReadyInputSchema,
+  markMergeReadyOutputSchema,
+  mergePrInputSchema,
+  mergePrOutputSchema,
+  requestCopilotReviewInputSchema,
+  requestCopilotReviewOutputSchema
+} from '#root/src/tools/schemas.js';
 
 const notImplemented = (toolName: string) => async (_input: unknown) => {
   return err(notImplementedError(toolName));
@@ -137,6 +148,39 @@ export function createToolRegistry(context: ToolExecutionContext) {
       inputSchema: requestNextRoundInputSchema,
       outputSchema: requestNextRoundOutputSchema,
       handler: createRequestNextRoundHandler(context)
+    },
+    {
+      name: 'request_copilot_review',
+      title: 'Request Copilot Review',
+      description: 'Request a Copilot review on a pull request.',
+      actorScopes: ['operator'] as const,
+      inputSchemaName: 'request_copilot_review.input',
+      outputSchemaName: 'request_copilot_review.output',
+      inputSchema: requestCopilotReviewInputSchema,
+      outputSchema: requestCopilotReviewOutputSchema,
+      handler: createRequestCopilotReviewHandler(context)
+    },
+    {
+      name: 'mark_merge_ready',
+      title: 'Mark Merge Ready',
+      description: 'Set or clear the merge-ready label on a pull request.',
+      actorScopes: ['operator'] as const,
+      inputSchemaName: 'mark_merge_ready.input',
+      outputSchemaName: 'mark_merge_ready.output',
+      inputSchema: markMergeReadyInputSchema,
+      outputSchema: markMergeReadyOutputSchema,
+      handler: createMarkMergeReadyHandler(context)
+    },
+    {
+      name: 'merge_pr',
+      title: 'Merge Pull Request',
+      description: 'Merge a pull request after the merge-ready gate is set.',
+      actorScopes: ['operator'] as const,
+      inputSchemaName: 'merge_pr.input',
+      outputSchemaName: 'merge_pr.output',
+      inputSchema: mergePrInputSchema,
+      outputSchema: mergePrOutputSchema,
+      handler: createMergePrHandler(context)
     },
     {
       name: 'git.push',
