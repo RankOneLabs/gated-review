@@ -16,7 +16,7 @@ bun install
 - `bun run typecheck`
 - `bun run test:contracts`
 - `bun run test:integration`
-- `bun test`
+- `bun run test`
 
 ## Build And Start
 

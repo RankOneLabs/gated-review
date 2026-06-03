@@ -10,10 +10,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.js",
-    "test:contracts": "bun test test/contracts",
-    "test:integration": "bun test test/integration",
+    "test:contracts": "bun run test -- test/contracts",
+    "test:integration": "bun run test -- test/integration",
     "test": "vitest run --configLoader runner",
-    "test:all": "bun test",
+    "test:all": "bun run test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

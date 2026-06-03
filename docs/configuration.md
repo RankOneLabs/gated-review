@@ -7,13 +7,13 @@ This server starts from typed GitHub App configuration and fails fast if any req
 - `GITHUB_APP_ID`: GitHub App identifier.
 - `GITHUB_APP_INSTALLATION_ID`: installation identifier for the repository you want the server to operate on.
 - `GITHUB_APP_PRIVATE_KEY` or `GITHUB_APP_PRIVATE_KEY_PATH`: the App private key in PEM form.
-- `GITHUB_REPOSITORY`: repository scope in `owner/name` form when you want to pin the server to a specific repo.
 
 ## Optional Variables
 
 - `GITHUB_API_BASE_URL`: defaults to `https://api.github.com`.
 - `GITHUB_GRAPHQL_URL`: defaults to `https://api.github.com/graphql`.
 - `GITHUB_COPILOT_REVIEWER_LOGIN`: reviewer login used by `request_copilot_review`, defaults to `copilot[bot]`.
+- `GITHUB_REPOSITORY`: repository scope in `owner/name` form when you want to pin the server to a specific repo.
 
 ## Private Key Format
 

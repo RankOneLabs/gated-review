@@ -10,8 +10,8 @@ This server uses an installation token. Grant the smallest set of permissions th
   - Required for issue comments and label management.
 - `Contents: read and write`
   - Required for git push, pull, and fetch operations that run through the installation token.
-- `Checks: read`
-  - Required for reading the combined check state surfaced by `pr_status`.
+- `Commit statuses: read`
+  - Required for reading the combined status state surfaced by `pr_status`.
 - `Metadata: read`
   - Required for repository introspection.
 

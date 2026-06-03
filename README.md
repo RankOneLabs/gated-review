@@ -23,6 +23,6 @@ Bounded MCP server for agent-driven GitHub PR reviews, with enforced triage and 
 ## Verification
 
 - `bun run typecheck`
-- `bun test`
+- `bun run test`
 - `bun run test:contracts`
 - `bun run test:integration`
