@@ -189,6 +189,7 @@ describe('getReviewRound', () => {
 
     const result = await getReviewRound(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       {
@@ -265,6 +266,7 @@ describe('getReviewRound', () => {
 
     const result = await getReviewRound(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42,
         includeResolved: true
       },

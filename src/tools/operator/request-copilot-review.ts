@@ -3,6 +3,7 @@ import { githubError, validationRejectedError, type ToolDomainError } from '#roo
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { requestCopilotReviewInputSchema } from '#root/src/tools/schemas.js';
 import type { RequestCopilotReviewOutput } from '#root/src/tools/types.js';
+import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
 
 function mapGitHubError(error: { category: string; message: string; requestLabel: string; status?: number }) {
   const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
@@ -22,8 +23,13 @@ export function createRequestCopilotReviewHandler(context: ToolExecutionContext)
     }
 
     const parsedInput = parsed.data;
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('request_copilot_review', repoRef.error.detail));
+    }
+
     const result = await context.github.rest.requestPullRequestReviewers(
-      context.repository,
+      repoRef.value,
       parsedInput.pullRequestNumber,
       [context.copilotReviewerLogin]
     );

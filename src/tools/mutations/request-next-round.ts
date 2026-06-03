@@ -4,9 +4,11 @@ import { validationRejectedError, type ToolDomainError } from '#root/src/errors.
 import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
+import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
 
 export const requestNextRoundInputSchema = z
   .object({
+    repository: z.string().min(1),
     pullRequestNumber: z.number().int().positive()
   })
   .strict()
@@ -32,8 +34,13 @@ export function createRequestNextRoundHandler(context: ToolExecutionContext) {
     }
 
     const parsedInput = parsed.data;
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('request_next_round', repoRef.error.detail));
+    }
+
     const result = await context.github.rest.createIssueComment(
-      context.repository,
+      repoRef.value,
       parsedInput.pullRequestNumber,
       '@coderabbitai review'
     );

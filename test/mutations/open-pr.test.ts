@@ -78,6 +78,7 @@ describe('open_pr', () => {
     });
 
     const result = await handler({
+      repository: 'openai/gated-review',
       base: 'main',
       head: 'feature-branch',
       title: 'Add feature',

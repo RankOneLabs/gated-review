@@ -122,6 +122,7 @@ describe('getPrStatus', () => {
 
     const result = await getPrStatus(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       {
@@ -223,6 +224,7 @@ describe('getPrStatus', () => {
 
     const result = await getPrStatus(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       {

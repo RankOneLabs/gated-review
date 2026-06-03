@@ -13,6 +13,7 @@ import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js'
 
 export const gitFetchInputSchema = z
   .object({
+    repository: z.string().min(1),
     repo_path: z.string().min(1),
     refspec: z.string().min(1).optional()
   })

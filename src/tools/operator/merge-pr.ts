@@ -8,6 +8,7 @@ import {
   mergePrOutputSchema
 } from '#root/src/tools/schemas.js';
 import { loadMergeReadyState } from '#root/src/tools/operator/merge-ready.js';
+import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
 
 export type MergePrInput = z.infer<typeof mergePrInputSchema>;
 export type MergePrOutput = z.infer<typeof mergePrOutputSchema>;
@@ -33,7 +34,12 @@ export function createMergePrHandler(context: ToolExecutionContext) {
     }
 
     const parsedInput = parsed.data;
-    const mergeReady = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('merge_pr', repoRef.error.detail));
+    }
+
+    const mergeReady = await loadMergeReadyState(context, repoRef.value, parsedInput.pullRequestNumber);
     if (!mergeReady.ok) {
       return err(remapToolError(mergeReady.error));
     }
@@ -47,7 +53,7 @@ export function createMergePrHandler(context: ToolExecutionContext) {
       );
     }
 
-    const result = await context.github.rest.mergePullRequest(context.repository, parsedInput.pullRequestNumber, {
+    const result = await context.github.rest.mergePullRequest(repoRef.value, parsedInput.pullRequestNumber, {
       mergeMethod: parsedInput.mergeMethod,
       commitTitle: parsedInput.commitTitle,
       commitMessage: parsedInput.commitMessage,

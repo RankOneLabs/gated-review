@@ -67,7 +67,7 @@ describe('git tool handlers', () => {
     });
 
     const tool = createPushTool(provider);
-    const result = await tool.handler({ repo_path: repoPath });
+    const result = await tool.handler({ repository: 'openai/gated-review', repo_path: repoPath });
 
     expect(result).toEqual({ ok: true, value: { ok: true } });
   });
@@ -92,7 +92,7 @@ describe('git tool handlers', () => {
     });
 
     const tool = createPullTool(provider);
-    const result = await tool.handler({ repo_path: repoPath, rebase: true });
+    const result = await tool.handler({ repository: 'openai/gated-review', repo_path: repoPath, rebase: true });
 
     expect(result).toEqual({ ok: true, value: { ok: true, head_sha: 'abc123' } });
   });
@@ -116,6 +116,7 @@ describe('git tool handlers', () => {
 
     const tool = createGitFetchTool(provider);
     const result = await tool.handler({
+      repository: 'openai/gated-review',
       repo_path: repoPath,
       refspec: 'refs/heads/main:refs/remotes/origin/main'
     });

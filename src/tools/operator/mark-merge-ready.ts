@@ -4,6 +4,7 @@ import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { markMergeReadyInputSchema } from '#root/src/tools/schemas.js';
 import { addMergeReadyLabel, removeMergeReadyLabel } from '#root/src/tools/operator/merge-ready.js';
 import type { MarkMergeReadyOutput } from '#root/src/tools/types.js';
+import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
 
 function remapToolError(error: ToolDomainError): ToolDomainError {
   return {
@@ -23,14 +24,18 @@ export function createMarkMergeReadyHandler(context: ToolExecutionContext) {
     }
 
     const parsedInput = parsed.data;
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('mark_merge_ready', repoRef.error.detail));
+    }
 
     if (parsedInput.ready) {
-      const label = await addMergeReadyLabel(context, parsedInput.pullRequestNumber);
+      const label = await addMergeReadyLabel(context, repoRef.value, parsedInput.pullRequestNumber);
       if (!label.ok) {
         return err(remapToolError(label.error));
       }
     } else {
-      const label = await removeMergeReadyLabel(context, parsedInput.pullRequestNumber);
+      const label = await removeMergeReadyLabel(context, repoRef.value, parsedInput.pullRequestNumber);
       if (!label.ok) {
         return err(remapToolError(label.error));
       }

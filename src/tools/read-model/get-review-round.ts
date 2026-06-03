@@ -3,6 +3,7 @@ import { githubRequestFailedError, validationRejectedError, type ToolDomainError
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { getReviewRoundInputSchema } from '#root/src/tools/schemas.js';
+import { parseRepoSlug, type RepositoryRef } from '#root/src/tools/repository-ref.js';
 import { tagEntity } from '#root/src/tools/read-model/entity.js';
 import {
   reviewRoundSummariesQuery,
@@ -70,6 +71,7 @@ function toSummaryComment(
 
 async function requestReviewThreadsPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number,
   after: string | null
 ): Promise<Result<GraphQLReviewRoundThreadsQueryData, ToolDomainError>> {
@@ -78,8 +80,8 @@ async function requestReviewThreadsPage(
     requestLabel: graphqlRequestLabel,
     query: reviewRoundThreadsQuery,
     variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
+      owner: repository.owner,
+      repo: repository.repo,
       number: pullRequestNumber,
       after
     }
@@ -139,6 +141,7 @@ async function requestThreadCommentsPage(
 
 async function requestSummaryCommentsPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number,
   after: string | null
 ): Promise<Result<GraphQLReviewRoundSummariesQueryData, ToolDomainError>> {
@@ -147,8 +150,8 @@ async function requestSummaryCommentsPage(
     requestLabel: graphqlRequestLabel,
     query: reviewRoundSummariesQuery,
     variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
+      owner: repository.owner,
+      repo: repository.repo,
       number: pullRequestNumber,
       after
     }
@@ -204,13 +207,14 @@ async function loadThreadComments(
 
 async function loadSummaryComments(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number
 ): Promise<Result<ReadModelSummaryComment[], ToolDomainError>> {
   const summaries: Array<ReadModelSummaryComment> = [];
   let after: string | null = null;
 
   while (true) {
-    const page = await requestSummaryCommentsPage(context, pullRequestNumber, after);
+    const page = await requestSummaryCommentsPage(context, repository, pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -258,6 +262,11 @@ export async function getReviewRound(
   }
 
   const parsedInput = parsed.data;
+  const repoRef = parseRepoSlug(parsedInput.repository);
+  if (!repoRef.ok) {
+    return err(validationRejectedError(operationName, repoRef.error.detail));
+  }
+
   const threads: Array<{
     id: string;
     state: 'open' | 'resolved';
@@ -268,7 +277,7 @@ export async function getReviewRound(
   let after: string | null = null;
 
   while (true) {
-    const page = await requestReviewThreadsPage(context, parsedInput.pullRequestNumber, after);
+    const page = await requestReviewThreadsPage(context, repoRef.value, parsedInput.pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -318,7 +327,7 @@ export async function getReviewRound(
     return comments;
   }
 
-  const summaries = await loadSummaryComments(context, parsedInput.pullRequestNumber);
+  const summaries = await loadSummaryComments(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!summaries.ok) {
     return summaries;
   }

@@ -132,6 +132,7 @@ describe('git gateway integration', () => {
     await git(fixture.repoPath, ['commit', '-m', 'local push change']);
 
     const pushResult = await createGitPushTool(dependenciesProvider).handler({
+      repository: 'openai/gated-review',
       repo_path: fixture.repoPath
     });
     expect(pushResult).toEqual({ ok: true, value: { ok: true } });
@@ -147,6 +148,7 @@ describe('git gateway integration', () => {
     await git(fixture.upstreamPath, ['push', 'origin', 'main']);
 
     const pullResult = await createGitPullTool(dependenciesProvider).handler({
+      repository: 'openai/gated-review',
       repo_path: fixture.repoPath,
       rebase: true
     });
@@ -162,6 +164,7 @@ describe('git gateway integration', () => {
     await git(fixture.upstreamPath, ['push', 'origin', 'feature']);
 
     const fetchResult = await createGitFetchTool(dependenciesProvider).handler({
+      repository: 'openai/gated-review',
       repo_path: fixture.repoPath,
       refspec: 'refs/heads/feature:refs/remotes/origin/feature'
     });

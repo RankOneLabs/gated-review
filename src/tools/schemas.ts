@@ -109,6 +109,7 @@ export const reviewDecisionOutputSchema = z
 
 export const requestCopilotReviewInputSchema = z
   .object({
+    repository: z.string().min(1),
     pullRequestNumber: z.number().int().positive()
   })
   .strict()
@@ -123,6 +124,7 @@ export const requestCopilotReviewOutputSchema = z
 
 export const markMergeReadyInputSchema = z
   .object({
+    repository: z.string().min(1),
     pullRequestNumber: z.number().int().positive(),
     ready: z.boolean()
   })
@@ -142,6 +144,7 @@ export const mergePrMergeMethodSchema = z
 
 export const mergePrInputSchema = z
   .object({
+    repository: z.string().min(1),
     pullRequestNumber: z.number().int().positive(),
     mergeMethod: mergePrMergeMethodSchema,
     commitTitle: z.string().min(1).optional(),
@@ -225,6 +228,7 @@ export const mergeReadyStateSchema = z
 
 export const getReviewRoundInputSchema = z
   .object({
+    repository: z.string().min(1),
     pullRequestNumber: z.number().int().positive(),
     includeResolved: z.boolean().optional()
   })
@@ -244,6 +248,7 @@ export const getReviewRoundOutputSchema = z
 
 export const prStatusInputSchema = z
   .object({
+    repository: z.string().min(1),
     pullRequestNumber: z.number().int().positive()
   })
   .strict()

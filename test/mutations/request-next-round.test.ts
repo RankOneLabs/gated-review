@@ -78,6 +78,7 @@ describe('request_next_round', () => {
     });
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17
     });
 

@@ -11,6 +11,7 @@ import {
 
 export const replyToThreadInputSchema = z
   .object({
+    repository: z.string().min(1),
     threadId: z.string().min(1),
     body: z.string().min(1)
   })

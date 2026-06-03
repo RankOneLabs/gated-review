@@ -241,6 +241,7 @@ describe('read-model integration', () => {
 
     const result = await getReviewRound(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       context
@@ -299,6 +300,7 @@ describe('read-model integration', () => {
 
     const result = await getPrStatus(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       context

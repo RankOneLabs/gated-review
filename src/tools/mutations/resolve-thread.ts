@@ -8,6 +8,7 @@ import { resolveReviewThread } from '#root/src/tools/mutations/graphql-mutations
 
 export const resolveThreadInputSchema = z
   .object({
+    repository: z.string().min(1),
     threadId: z.string().min(1)
   })
   .strict()
