@@ -32,6 +32,10 @@ watermark, and no physical gate on operator-only actions.
 `ghreview` is the raw-GitHub fallback. If the MCP server is present, always prefer
 `gated-rev`.
 
+**Where it lives:** `ghreview` is a built-in Claude Code skill installed separately —
+it is not shipped in this repository. It lives at `~/.claude/skills/ghreview/SKILL.md`
+on machines where Claude Code is installed.
+
 ## Selecting the right skill
 
 | Situation | Use |

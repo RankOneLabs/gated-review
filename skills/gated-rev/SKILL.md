@@ -35,12 +35,14 @@ These are non-negotiable constraints, not preferences:
 
 ## Fetch
 
-Call `get_review_round` once with `{ repository: REPO, pullRequestNumber: PR }`.
+Call `get_review_round` initially with `{ repository: REPO, pullRequestNumber: PR }`.
+You may call it again after a push (to verify freshness) or whenever the operator
+requests a re-triage — "once" does not mean "never again".
 
 The response envelope contains:
-- `threads` — review threads, each with `state` (open/resolved), `path`, `line`,
-  `hasFreshComments`, and `comments` (array with `author.kind`, `author.login`, `body`,
-  `createdAt`)
+- `threads` — review threads, each with `state` (open/resolved), `path` (nullable),
+  `line` (nullable), `hasFreshComments`, and `comments` (array with `author.kind`,
+  `author.login`, `body`, `createdAt`)
 - `openThreadCount` — total unresolved threads
 - `freshSince` — watermark timestamp; threads with `hasFreshComments: true` arrived
   after this watermark
@@ -84,6 +86,9 @@ with `[NEW]`.
    → Why: reason to skip
 ```
 
+When `path` or `line` is null, render the location as `(no file location)` rather
+than `null:null`.
+
 If there are CodeRabbit/Copilot summaries worth noting, append a brief **Summaries**
 section after the buckets.
 
@@ -104,9 +109,10 @@ Unresolved threads are the agent inbox. Resolving is how a handled thread leaves
 The freshness watermark is derived from unresolved threads — resolving too early or too
 late corrupts the "what's new" signal.
 
-**Fix path:** make the code change → call `git.push { repository: REPO, ... }` →
+**Fix path:** make the code change → call `git.push { repository: REPO, repo_path: <local-repo-path>, branch: <branch> }` →
 call `resolve_thread { repository: REPO, threadId }`. Resolve only after the push
-confirms. Never resolve before the fix is pushed.
+confirms. Never resolve before the fix is pushed. (`repo_path` is required by the
+schema — omitting it will fail validation.)
 
 **Discuss path:** call `reply_to_thread { repository: REPO, threadId, body }` with
 your question or position. Leave the thread **UNRESOLVED**. Do not resolve until the
