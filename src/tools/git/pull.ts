@@ -10,10 +10,11 @@ import {
   type GitRunnerDependenciesProvider
 } from '#root/src/tools/git/runner.js';
 import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js';
+import { repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const gitPullInputSchema = z
   .object({
-    repository: z.string().min(1),
+    repository: repositorySlugSchema,
     repo_path: z.string().min(1),
     branch: z.string().min(1).optional(),
     rebase: z.boolean().optional()

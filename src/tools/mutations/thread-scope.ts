@@ -19,13 +19,28 @@ export async function enforceThreadRepository(
   threadId: string,
   repoRef: RepositoryRef
 ): Promise<Result<true, ToolDomainError>> {
+  const requestedRepository = `${repoRef.owner}/${repoRef.repo}`;
+
   const lookup = await fetchReviewThreadRepository(client, { threadId });
   if (!lookup.ok) {
-    return err(mapGitHubError(operation, lookup.error));
+    const error = mapGitHubError(operation, lookup.error);
+    console.warn('[gated-review] thread scope lookup failed', {
+      operation,
+      threadId,
+      requestedRepository,
+      detail: error.detail
+    });
+    return err(error);
   }
 
   const nameWithOwner = lookup.value.node?.pullRequest?.repository.nameWithOwner;
   if (nameWithOwner === undefined) {
+    console.warn('[gated-review] thread scope rejected', {
+      operation,
+      threadId,
+      requestedRepository,
+      detail: 'thread not found or not a pull request review thread'
+    });
     return err(
       validationRejectedError(
         operation,
@@ -34,15 +49,27 @@ export async function enforceThreadRepository(
     );
   }
 
-  const expected = `${repoRef.owner}/${repoRef.repo}`;
-  if (nameWithOwner.toLowerCase() !== expected.toLowerCase()) {
+  if (nameWithOwner.toLowerCase() !== requestedRepository.toLowerCase()) {
+    console.warn('[gated-review] thread scope rejected', {
+      operation,
+      threadId,
+      requestedRepository,
+      resolvedRepository: nameWithOwner,
+      detail: 'repository mismatch'
+    });
     return err(
       validationRejectedError(
         operation,
-        `Review thread ${threadId} belongs to ${nameWithOwner}, not the requested repository ${expected}.`
+        `Review thread ${threadId} belongs to ${nameWithOwner}, not the requested repository ${requestedRepository}.`
       )
     );
   }
 
+  console.info('[gated-review] thread scope verified', {
+    operation,
+    threadId,
+    requestedRepository,
+    resolvedRepository: nameWithOwner
+  });
   return ok(true);
 }

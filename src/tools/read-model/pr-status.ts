@@ -135,9 +135,8 @@ export async function getPrStatus(
   }
 
   const freshness = context.freshness;
-  const shouldPurgeFreshness =
-    freshness !== undefined &&
-    (openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED');
+  const isTerminalState =
+    openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED';
 
   const mergeReady = await loadMergeReadyState(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!mergeReady.ok) {
@@ -152,7 +151,9 @@ export async function getPrStatus(
     return err(mapGitHubError(status.error));
   }
 
-  if (shouldPurgeFreshness) {
+  // Purge only after the downstream reads succeed, so a transient read failure
+  // can't delete the watermark and re-open stale delivery on the next round.
+  if (freshness !== undefined && isTerminalState) {
     const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
     freshness.purge(key);
   }

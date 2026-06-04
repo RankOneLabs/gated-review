@@ -7,10 +7,10 @@ import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
-import { createGitFetchTool } from '#root/src/tools/git/fetch.js';
+import { createGitFetchTool, gitFetchInputSchema } from '#root/src/tools/git/fetch.js';
 import type { GitSpawn } from '#root/src/tools/git/runner.js';
-import { createGitPullTool as createPullTool } from '#root/src/tools/git/pull.js';
-import { createGitPushTool as createPushTool } from '#root/src/tools/git/push.js';
+import { createGitPullTool as createPullTool, gitPullInputSchema } from '#root/src/tools/git/pull.js';
+import { createGitPushTool as createPushTool, gitPushInputSchema } from '#root/src/tools/git/push.js';
 
 type SpawnResponse = Readonly<{
   stdout?: string;
@@ -123,4 +123,24 @@ describe('git tool handlers', () => {
 
     expect(result).toEqual({ ok: true, value: { ok: true } });
   });
+});
+
+describe('git tool repository slug validation', () => {
+  const schemas = [
+    { name: 'git.push', schema: gitPushInputSchema },
+    { name: 'git.pull', schema: gitPullInputSchema },
+    { name: 'git.fetch', schema: gitFetchInputSchema }
+  ];
+
+  for (const { name, schema } of schemas) {
+    it(`${name} rejects a repository that is not an owner/name slug`, () => {
+      const result = schema.safeParse({ repository: 'not-a-slug', repo_path: '/tmp/repo' });
+      expect(result.success).toBe(false);
+    });
+
+    it(`${name} accepts a well-formed owner/name slug`, () => {
+      const result = schema.safeParse({ repository: 'openai/gated-review', repo_path: '/tmp/repo' });
+      expect(result.success).toBe(true);
+    });
+  }
 });
