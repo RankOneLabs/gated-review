@@ -290,10 +290,12 @@ async function resolveRemoteHost(
     return err(toValidationError('git.remote', `origin host ${parsedUrl.host} is not an allowed GitHub host.`));
   }
 
-  const segments = parsedUrl.pathname.replace(/^\/+/, '').split('/');
+  // Drop leading and trailing slashes so a trailing `/` does not register as an
+  // extra empty segment; a valid GitHub repo path is exactly owner/repo(.git).
+  const segments = parsedUrl.pathname.replace(/^\/+/, '').replace(/\/+$/, '').split('/');
   const owner = segments[0] ?? '';
   const repo = (segments[1] ?? '').replace(/\.git$/, '');
-  if (owner === '' || repo === '') {
+  if (owner === '' || repo === '' || segments.length !== 2) {
     return err(toValidationError('git.remote', `origin remote ${parsedUrl.host} path must be /owner/repo.`));
   }
 
