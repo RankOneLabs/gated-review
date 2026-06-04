@@ -10,11 +10,12 @@ import { repositorySlugSchema } from '#root/src/tools/repository-ref.js';
  * makes zod throw "Transforms cannot be represented in JSON Schema", aborting
  * the entire list call. The brand is applied at the type level only, via the
  * cast — consistent with the project rule that branding lives in the types, not
- * the wire shape. Handlers receive already-validated strings typed as the
- * branded id.
+ * the wire shape. The input type stays `string` to match the wire (so
+ * `z.input<typeof reviewIdSchema>` reads as `string`, not the brand); only the
+ * parsed output is branded, so handlers receive already-validated branded ids.
  */
-const brandedIdSchema = <TName extends string>(): z.ZodType<Brand<TName>, Brand<TName>> =>
-  z.string().min(1) as unknown as z.ZodType<Brand<TName>, Brand<TName>>;
+const brandedIdSchema = <TName extends string>(): z.ZodType<Brand<TName>, string> =>
+  z.string().min(1) as unknown as z.ZodType<Brand<TName>, string>;
 
 export const reviewIdSchema = brandedIdSchema<'ReviewId'>();
 export const actionIdSchema = brandedIdSchema<'ActionId'>();
