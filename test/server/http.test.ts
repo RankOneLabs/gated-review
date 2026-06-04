@@ -102,16 +102,25 @@ const MCP_HEADERS = {
   Accept: 'application/json, text/event-stream'
 } as const;
 
-/** Extracts the JSON-RPC payload from a Streamable HTTP SSE response body. */
+/**
+ * Extracts the JSON-RPC payload from a Streamable HTTP SSE response body. Per
+ * the SSE spec an event may carry multiple `data:` lines that reconstruct the
+ * payload when joined with `\n`, so collect every `data:` line of the first
+ * event rather than only the first line.
+ */
 function parseSseMessage(body: string): unknown {
-  const dataLine = body
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .find((line) => line.startsWith('data:'));
-  if (dataLine === undefined) {
+  const event = body
+    .split(/\r?\n\r?\n/)
+    .find((chunk) => chunk.split(/\r?\n/).some((line) => line.startsWith('data:')));
+  if (event === undefined) {
     throw new Error(`no SSE data frame in response body: ${JSON.stringify(body)}`);
   }
-  return JSON.parse(dataLine.slice('data:'.length).trim());
+  const payload = event
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice('data:'.length).replace(/^ /, ''))
+    .join('\n');
+  return JSON.parse(payload);
 }
 
 describe('HTTP MCP server startup', () => {
