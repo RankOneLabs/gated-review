@@ -7,7 +7,7 @@ The server reads all configuration from environment variables at startup and fai
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `GITHUB_APP_ID` | Yes | — | Numeric GitHub App identifier. |
-| `GITHUB_APP_INSTALLATION_ID` | Yes | — | Numeric installation identifier. Must be the installation that covers every repository the server will operate on. |
+| `GITHUB_APP_INSTALLATION_ID` | No | — | Numeric installation id. **Set it** to pin the server to a single installation (one account). **Omit it** to resolve the installation per repository owner automatically, so one deployment can serve repos across multiple accounts (see [Installation routing](#installation-routing)). |
 | `GITHUB_APP_PRIVATE_KEY` | Yes* | — | App private key in PEM form, inline. Escaped `\n` sequences are normalized to real newlines. |
 | `GITHUB_APP_PRIVATE_KEY_PATH` | Yes* | — | Path to a PEM file containing the App private key. Read as UTF-8 at startup. |
 | `GATED_REVIEW_HTTP_PORT` | Yes | — | Port the HTTP MCP server listens on (e.g. `3555`). Must be a positive integer ≤ 65535. |
@@ -17,9 +17,18 @@ The server reads all configuration from environment variables at startup and fai
 
 \* At least one is required. If both are set, `GITHUB_APP_PRIVATE_KEY` takes priority and `GITHUB_APP_PRIVATE_KEY_PATH` is ignored.
 
+## Installation routing
+
+A GitHub App installation is scoped to a single account (org or user), so its installation id is a property of the repository **owner**, not the individual repo.
+
+- **Fixed mode** — set `GITHUB_APP_INSTALLATION_ID`. Every request uses that one installation; all target repos must live under the single account it covers.
+- **Discovery mode** — omit `GITHUB_APP_INSTALLATION_ID`. For each request the server calls `GET /repos/{owner}/{repo}/installation` with the App JWT, caches the result per owner, and mints the matching installation token. Install the App on every account you want to serve (e.g. a personal account *and* an org) and it works with no installation ids configured. If the App is not installed on a requested owner, the call fails with a clear "App is not installed on `{owner}`" error.
+
+Discovery mode covers `git.*` operations too — the owner is taken from the repo's `origin` remote.
+
 ## What Is Not Here
 
-**No `GITHUB_REPOSITORY`.** The server is multi-repo: the repository is supplied by the agent on each tool call, not pinned at startup. The installation token must have access to every repository the agent targets.
+**No `GITHUB_REPOSITORY`.** The server is multi-repo: the repository is supplied by the agent on each tool call, not pinned at startup. The App's installation(s) must have access to every repository the agent targets.
 
 **No `GATED_REVIEW_ACTOR`.** The MCP surface is agent-only; operator verbs are absent from it by construction, not by a runtime switch. There is no actor variable to set.
 

@@ -57,7 +57,8 @@ export function createReplyToThreadHandler(context: ToolExecutionContext) {
 
     const result = await addPullRequestReviewThreadReply(context.github.graphql, {
       threadId: parsedInput.threadId,
-      body: parsedInput.body
+      body: parsedInput.body,
+      repository: { owner: repoRef.value.owner, repo: repoRef.value.repo }
     } satisfies AddPullRequestReviewThreadReplyInput);
 
     if (!result.ok) {

@@ -4,7 +4,13 @@ import { err, ok, type Result } from '#root/src/result.js';
 
 export type GitHubAppConfig = {
   appId: number;
-  installationId: number;
+  /**
+   * Fixed installation id. When set, every request uses this single installation
+   * (legacy single-account mode). When omitted, the server discovers the
+   * installation per repository owner, letting one deployment serve repos across
+   * multiple accounts.
+   */
+  installationId?: number;
   privateKey: string;
   apiBaseUrl: string;
   graphqlUrl: string;
@@ -62,6 +68,19 @@ function parsePositiveInteger(value: string | undefined, variableName: string, m
   }
 
   return ok(parsed);
+}
+
+function parseOptionalPositiveInteger(value: string | undefined, variableName: string) {
+  if (value === undefined || value.trim() === '') {
+    return ok<number | undefined, GitHubConfigError>(undefined);
+  }
+
+  const parsed = parsePositiveInteger(value, variableName);
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  return ok<number | undefined, GitHubConfigError>(parsed.value);
 }
 
 function normalizePrivateKey(privateKey: string) {
@@ -137,7 +156,7 @@ export async function loadGitHubAppConfig(
     return err<GitHubAppConfig, GitHubConfigError>(appId.error);
   }
 
-  const installationId = parsePositiveInteger(
+  const installationId = parseOptionalPositiveInteger(
     env.GITHUB_APP_INSTALLATION_ID,
     'GITHUB_APP_INSTALLATION_ID'
   );

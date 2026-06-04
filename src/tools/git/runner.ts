@@ -4,6 +4,7 @@ import { stat } from 'node:fs/promises';
 import { err, ok, type Result } from '#root/src/result.js';
 import { gitCommandFailedError, validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
+import type { InstallationIdResolver } from '#root/src/github/rest.js';
 import { createGitHubExtraHeader, redactGitHubExtraHeader } from '#root/src/tools/git/credentials.js';
 import { validateGitBranchName, validateGitRefspec } from '#root/src/tools/git/validation.js';
 
@@ -38,7 +39,9 @@ export type GitFetchOutput = Readonly<{
 }>;
 
 export type GitRunnerDependencies = Readonly<{
-  installationId: number;
+  /** Fixed installation id (single-account mode); omit to resolve per remote owner. */
+  installationId?: number;
+  resolveInstallationId?: InstallationIdResolver;
   tokenProvider: GitHubInstallationTokenProvider;
   githubHosts: readonly string[];
   spawn?: GitSpawn;
@@ -244,12 +247,14 @@ async function resolveCurrentBranch(
   return ok(validatedBranch.value);
 }
 
+type RemoteTarget = Readonly<{ host: string; owner: string; repo: string }>;
+
 async function resolveRemoteHost(
   repoPath: string,
   allowedHosts: readonly string[],
   spawnImpl: GitSpawn,
   commandTimeoutMs?: number
-): Promise<Result<string, ToolDomainError>> {
+): Promise<Result<RemoteTarget, ToolDomainError>> {
   const remoteResult = await executeGitCommand(
     spawnImpl,
     'remote_url',
@@ -285,14 +290,51 @@ async function resolveRemoteHost(
     return err(toValidationError('git.remote', `origin host ${parsedUrl.host} is not an allowed GitHub host.`));
   }
 
-  return ok(parsedUrl.host);
+  // Drop leading and trailing slashes so a trailing `/` does not register as an
+  // extra empty segment; a valid GitHub repo path is exactly owner/repo(.git).
+  const segments = parsedUrl.pathname.replace(/^\/+/, '').replace(/\/+$/, '').split('/');
+  const owner = segments[0] ?? '';
+  const repo = (segments[1] ?? '').replace(/\.git$/, '');
+  if (owner === '' || repo === '' || segments.length !== 2) {
+    return err(toValidationError('git.remote', `origin remote ${parsedUrl.host} path must be /owner/repo.`));
+  }
+
+  return ok({ host: parsedUrl.host, owner, repo });
+}
+
+async function resolveGitInstallationId(
+  dependencies: GitRunnerDependencies,
+  target: RemoteTarget,
+  operation: string
+): Promise<Result<number, ToolDomainError>> {
+  if (dependencies.resolveInstallationId !== undefined) {
+    const resolved = await dependencies.resolveInstallationId(target.owner, target.repo);
+    if (!resolved.ok) {
+      return err(toCommandError(operation, 'token', resolved.error.message));
+    }
+    return ok(resolved.value);
+  }
+
+  if (dependencies.installationId !== undefined) {
+    return ok(dependencies.installationId);
+  }
+
+  return err(
+    toCommandError(operation, 'token', 'No installation routing configured for git operations.')
+  );
 }
 
 async function resolveInstallationToken(
   dependencies: GitRunnerDependencies,
+  target: RemoteTarget,
   operation: string
 ): Promise<Result<string, ToolDomainError>> {
-  const mintedToken = await dependencies.tokenProvider.getInstallationToken(dependencies.installationId);
+  const installationId = await resolveGitInstallationId(dependencies, target, operation);
+  if (!installationId.ok) {
+    return installationId;
+  }
+
+  const mintedToken = await dependencies.tokenProvider.getInstallationToken(installationId.value);
   if (!mintedToken.ok) {
     const message = mintedToken.error.message;
     return err(toCommandError(operation, 'token', message));
@@ -316,22 +358,22 @@ async function runRemoteGitCommand(
   repoPath: string,
   command: readonly string[]
 ): Promise<Result<SpawnedCommandResult, ToolDomainError>> {
-  const host = await resolveRemoteHost(
+  const remote = await resolveRemoteHost(
     repoPath,
     dependencies.githubHosts,
     dependencies.spawn ?? defaultSpawn,
     dependencies.commandTimeoutMs
   );
-  if (!host.ok) {
-    return host;
+  if (!remote.ok) {
+    return remote;
   }
 
-  const token = await resolveInstallationToken(dependencies, operation);
+  const token = await resolveInstallationToken(dependencies, remote.value, operation);
   if (!token.ok) {
     return token;
   }
 
-  const extraHeader = createGitHubExtraHeader(host.value, token.value);
+  const extraHeader = createGitHubExtraHeader(remote.value.host, token.value);
   const args = buildGitArgs(repoPath, extraHeader, command);
   const result = await executeGitCommand(
     dependencies.spawn ?? defaultSpawn,

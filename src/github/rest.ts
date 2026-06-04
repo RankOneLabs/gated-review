@@ -18,11 +18,19 @@ export type GitHubRestRequest<TResponse> = Readonly<{
   method: GitHubRestMethod;
   path: string;
   body?: unknown;
+  /** Repository whose owner selects the App installation; falls back to the fixed id when absent. */
+  repository?: GitHubRepositoryScope;
 }>;
+
+export type InstallationIdResolver = (
+  owner: string,
+  repo: string
+) => Promise<Result<number, GitHubError>>;
 
 export type GitHubRestClientOptions = Readonly<{
   baseUrl: string;
-  installationId: number;
+  installationId?: number;
+  resolveInstallationId?: InstallationIdResolver;
   tokenProvider: GitHubInstallationTokenProvider;
 }>;
 
@@ -85,8 +93,32 @@ export function createGitHubRestClient(
 ) {
   const fetchFn: GitHubFetch = dependencies.fetch ?? globalThis.fetch;
 
+  async function resolveInstallationId(
+    repository?: GitHubRepositoryScope
+  ): Promise<Result<number, GitHubError>> {
+    if (repository !== undefined && options.resolveInstallationId !== undefined) {
+      return options.resolveInstallationId(repository.owner, repository.repo);
+    }
+    if (options.installationId !== undefined) {
+      return ok(options.installationId);
+    }
+    return err(
+      createGitHubError({
+        category: 'configuration',
+        operation: 'resolve_installation',
+        requestLabel: 'installation routing',
+        message: 'No installation routing configured: set an installation resolver or a fixed installation id.'
+      })
+    );
+  }
+
   async function request<TResponse>(input: GitHubRestRequest<TResponse>): Promise<Result<TResponse, GitHubError>> {
-    const token = await options.tokenProvider.getInstallationToken(options.installationId);
+    const installationId = await resolveInstallationId(input.repository);
+    if (!installationId.ok) {
+      return err(installationId.error);
+    }
+
+    const token = await options.tokenProvider.getInstallationToken(installationId.value);
     if (!token.ok) {
       return err(token.error);
     }
@@ -156,6 +188,7 @@ export function createGitHubRestClient(
         requestLabel: `POST ${buildRepositoryPath(repository, 'pulls')}`,
         method: 'POST',
         path: buildRepositoryPath(repository, 'pulls'),
+        repository,
         body: {
           title: input.title,
           head: input.head,
@@ -174,6 +207,7 @@ export function createGitHubRestClient(
         requestLabel: `POST ${buildRepositoryPath(repository, `issues/${issueNumber}/comments`)}`,
         method: 'POST',
         path: buildRepositoryPath(repository, `issues/${issueNumber}/comments`),
+        repository,
         body: { body }
       });
     },
@@ -188,6 +222,7 @@ export function createGitHubRestClient(
         requestLabel: `POST ${buildRepositoryPath(repository, `pulls/${pullRequestNumber}/requested_reviewers`)}`,
         method: 'POST',
         path: buildRepositoryPath(repository, `pulls/${pullRequestNumber}/requested_reviewers`),
+        repository,
         body: {
           ...(reviewers.length === 0 ? {} : { reviewers }),
           ...(teamReviewers.length === 0 ? {} : { team_reviewers: teamReviewers })
@@ -200,6 +235,7 @@ export function createGitHubRestClient(
         requestLabel: `POST ${buildRepositoryPath(repository, `issues/${issueNumber}/labels`)}`,
         method: 'POST',
         path: buildRepositoryPath(repository, `issues/${issueNumber}/labels`),
+        repository,
         body: { labels }
       });
     },
@@ -208,7 +244,8 @@ export function createGitHubRestClient(
         operationName: 'get_commit_combined_status',
         requestLabel: `GET ${buildRepositoryPath(repository, `commits/${commitSha}/status`)}`,
         method: 'GET',
-        path: buildRepositoryPath(repository, `commits/${commitSha}/status`)
+        path: buildRepositoryPath(repository, `commits/${commitSha}/status`),
+        repository
       });
     },
     mergePullRequest(
@@ -226,6 +263,7 @@ export function createGitHubRestClient(
         requestLabel: `PUT ${buildRepositoryPath(repository, `pulls/${pullRequestNumber}/merge`)}`,
         method: 'PUT',
         path: buildRepositoryPath(repository, `pulls/${pullRequestNumber}/merge`),
+        repository,
         body: {
           ...(input.mergeMethod === undefined ? {} : { merge_method: input.mergeMethod }),
           ...(input.commitTitle === undefined ? {} : { commit_title: input.commitTitle }),

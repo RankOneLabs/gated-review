@@ -40,7 +40,8 @@ async function requestMergeReadyPage(
       repo: repository.repo,
       number: pullRequestNumber,
       after
-    }
+    },
+    repository: { owner: repository.owner, repo: repository.repo }
   });
 
   if (!response.ok) {
@@ -99,7 +100,8 @@ async function getMergeReadyLabel(
     operationName: 'mark_merge_ready',
     requestLabel: `GET /repos/${repository.owner}/${repository.repo}/labels/${mergeReadyLabel}`,
     method: 'GET',
-    path: `/repos/${repository.owner}/${repository.repo}/labels/${mergeReadyLabel}`
+    path: `/repos/${repository.owner}/${repository.repo}/labels/${mergeReadyLabel}`,
+    repository: { owner: repository.owner, repo: repository.repo }
   });
 
   if (!response.ok) {
@@ -124,6 +126,7 @@ async function createMergeReadyLabel(
     requestLabel: `POST /repos/${repository.owner}/${repository.repo}/labels`,
     method: 'POST',
     path: `/repos/${repository.owner}/${repository.repo}/labels`,
+    repository: { owner: repository.owner, repo: repository.repo },
     body: {
       name: mergeReadyLabel,
       color: mergeReadyLabelColor,
@@ -198,7 +201,8 @@ export async function removeMergeReadyLabel(
     operationName: 'mark_merge_ready',
     requestLabel: `DELETE /repos/${repository.owner}/${repository.repo}/issues/${pullRequestNumber}/labels/${mergeReadyLabel}`,
     method: 'DELETE',
-    path: `/repos/${repository.owner}/${repository.repo}/issues/${pullRequestNumber}/labels/${mergeReadyLabel}`
+    path: `/repos/${repository.owner}/${repository.repo}/issues/${pullRequestNumber}/labels/${mergeReadyLabel}`,
+    repository: { owner: repository.owner, repo: repository.repo }
   });
 
   if (!response.ok) {

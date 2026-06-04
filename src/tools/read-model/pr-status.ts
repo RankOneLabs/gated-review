@@ -48,7 +48,8 @@ async function requestPrStatusPage(
       repo: repository.repo,
       number: pullRequestNumber,
       after
-    }
+    },
+    repository: { owner: repository.owner, repo: repository.repo }
   });
 
   if (!response.ok) {
