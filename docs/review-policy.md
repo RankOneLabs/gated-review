@@ -4,6 +4,27 @@ Review policy is orchestrator state, not MCP server state. The MCP server expose
 curated GitHub primitives and shaped read models; it does not count review
 rounds, decide when the loop is done, or mark a pull request merge-ready.
 
+## What the Server Does Hold
+
+The server holds one bounded, non-policy piece of per-PR state: a **delivery
+cursor** (`lastDelivered` watermark) that records the latest comment timestamp
+seen on the last `get_review_round` call. This cursor drives the
+`hasFreshComments` annotation and is described fully in
+[docs/freshness-model.md](freshness-model.md).
+
+The delivery cursor is ergonomics, not policy: it tells the agent which threads
+it has already seen, but it does not count rounds, enforce limits, or gate any
+operator action. It is held in memory (not persisted) for the server lifetime.
+
+## What the Server Does Not Hold
+
+- **Round count**: the server does not count how many triage invocations have
+  happened for a PR.
+- **Round policy / `maxReviewRounds`**: enforcement of round limits belongs to
+  the orchestrator (kbbl, oakridge, or another layer), not this server.
+- **MergeReady logic**: `merge_pr` enforces only that the `merge-ready` label
+  is present; whether to set that label is a human decision.
+
 ## Max Review Rounds
 
 Orchestrators may cap the number of operator-bounded review rounds with a
@@ -36,7 +57,11 @@ themselves.
 
 ## Server Boundary
 
-The server should continue to treat `MergeReady` as a human assertion recorded
-with the GitHub `merge-ready` label. `merge_pr` should only enforce that label;
-round counting and round-limit recommendations belong in kbbl, oakridge, or
-another orchestration layer.
+The server continues to treat `MergeReady` as a human assertion recorded with
+the GitHub `merge-ready` label. `merge_pr` enforces only that label; round
+counting and round-limit recommendations belong in the orchestration layer.
+
+The delivery cursor is the only per-PR state the server holds. Everything else
+— round counts, policy decisions, client-specific cursors — remains in the
+orchestration layer or is explicitly deferred (see
+[docs/deferred-items.md](deferred-items.md)).
