@@ -5,6 +5,21 @@ import type { GitHubFetch } from '#root/src/github/fetch.js';
 import { readGitHubErrorMessage } from '#root/src/github/response-error.js';
 import type { GitHubRepositoryScope, InstallationIdResolver } from '#root/src/github/rest.js';
 
+/**
+ * GitHub's GraphQL endpoint rejects any request whose `operationName` does not name
+ * an operation present in the document. Tool call sites pass `operationName` as a
+ * human-facing diagnostic label (e.g. `pr_status`) that need not match the query's
+ * operation (`PrStatusQuery`) — and a read tool may reuse one label across several
+ * queries. Derive the wire operation name from the document itself so the value sent
+ * to GitHub can never desync from the query. Returns undefined for an anonymous
+ * operation, in which case the field is omitted and GitHub runs the sole operation.
+ */
+const GRAPHQL_OPERATION_NAME_PATTERN = /\b(?:query|mutation|subscription)\s+([A-Za-z_]\w*)/;
+
+function graphqlOperationName(query: string): string | undefined {
+  return GRAPHQL_OPERATION_NAME_PATTERN.exec(query)?.[1];
+}
+
 export type GitHubGraphQLPrimitive = string | number | boolean | null;
 export type GitHubGraphQLValue = GitHubGraphQLPrimitive | ReadonlyArray<unknown> | Readonly<Record<string, unknown>>;
 
@@ -108,7 +123,7 @@ export function createGitHubGraphQLClient(
             'X-GitHub-Api-Version': '2022-11-28'
           },
           body: JSON.stringify({
-            operationName: request.operationName,
+            operationName: graphqlOperationName(request.query),
             query: request.query,
             variables: request.variables ?? {}
           })

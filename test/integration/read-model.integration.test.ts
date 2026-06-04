@@ -289,9 +289,9 @@ describe('read-model integration', () => {
     expect(
       requests.filter((entry) => entry.kind === 'graphql').map((entry) => (entry.request as { operationName: string }).operationName)
     ).toEqual([
-      'get_review_round',
-      'get_review_round',
-      'get_review_round'
+      'ReviewRoundThreadsQuery',
+      'ReviewThreadCommentsQuery',
+      'ReviewRoundSummariesQuery'
     ]);
   });
 
@@ -332,7 +332,7 @@ describe('read-model integration', () => {
 
     expect(
       requests.filter((entry) => entry.kind === 'graphql').map((entry) => (entry.request as { operationName: string }).operationName)
-    ).toEqual(['pr_status', 'merge_ready']);
+    ).toEqual(['PrStatusQuery', 'PrStatusLabelsQuery']);
     expect(
       requests.filter((entry) => entry.kind === 'rest').map((entry) => (entry.request as { method: string; url: string }).url)
     ).toContain('https://api.github.com/repos/openai/gated-review/commits/head-sha-123/status');
