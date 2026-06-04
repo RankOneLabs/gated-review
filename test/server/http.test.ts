@@ -97,6 +97,23 @@ const initBody = JSON.stringify({
   }
 });
 
+const MCP_HEADERS = {
+  'Content-Type': 'application/json',
+  Accept: 'application/json, text/event-stream'
+} as const;
+
+/** Extracts the JSON-RPC payload from a Streamable HTTP SSE response body. */
+function parseSseMessage(body: string): unknown {
+  const dataLine = body
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .find((line) => line.startsWith('data:'));
+  if (dataLine === undefined) {
+    throw new Error(`no SSE data frame in response body: ${JSON.stringify(body)}`);
+  }
+  return JSON.parse(dataLine.slice('data:'.length).trim());
+}
+
 describe('HTTP MCP server startup', () => {
   it('binds to a port and handles an MCP initialize request', async () => {
     const sessions = new Map<string, StreamableHTTPServerTransport>();
@@ -156,6 +173,57 @@ describe('HTTP MCP server startup', () => {
       expect(sessions.size).toBe(2);
       await r1.body?.cancel();
       await r2.body?.cancel();
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        httpServer.close((err) => (err ? reject(err) : resolve()))
+      );
+    }
+  });
+
+  // Regression: every tool's input and output schema must be representable in
+  // JSON Schema, because the SDK serializes them all when answering tools/list.
+  // A `.transform()` in any schema made this call fail with JSON-RPC -32603
+  // "Transforms cannot be represented in JSON Schema", leaving clients unable to
+  // discover any tool even though `initialize` succeeded.
+  it('answers tools/list with serializable schemas for every tool', async () => {
+    const sessions = new Map<string, StreamableHTTPServerTransport>();
+    const httpServer = buildHttpServer(sessions);
+
+    await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+    const { port } = httpServer.address() as AddressInfo;
+    const url = `http://127.0.0.1:${port}/mcp`;
+
+    try {
+      const initResponse = await fetch(url, { method: 'POST', headers: MCP_HEADERS, body: initBody });
+      expect(initResponse.status).toBe(200);
+      const sessionId = initResponse.headers.get('mcp-session-id');
+      expect(sessionId).toBeTruthy();
+      await initResponse.body?.cancel();
+
+      const sessionHeaders = { ...MCP_HEADERS, 'mcp-session-id': sessionId as string };
+
+      const initializedResponse = await fetch(url, {
+        method: 'POST',
+        headers: sessionHeaders,
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
+      });
+      expect(initializedResponse.status).toBe(202);
+      await initializedResponse.body?.cancel();
+
+      const listResponse = await fetch(url, {
+        method: 'POST',
+        headers: sessionHeaders,
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
+      });
+      expect(listResponse.status).toBe(200);
+
+      const message = parseSseMessage(await listResponse.text()) as {
+        error?: { message: string };
+        result?: { tools: Array<{ name: string }> };
+      };
+
+      expect(message.error).toBeUndefined();
+      expect(message.result?.tools.length).toBeGreaterThan(0);
     } finally {
       await new Promise<void>((resolve, reject) =>
         httpServer.close((err) => (err ? reject(err) : resolve()))

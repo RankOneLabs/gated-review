@@ -1,15 +1,25 @@
 import { z } from 'zod';
-import type { ActionId, DecisionId, EventId, ReviewId } from '#root/src/domain.js';
+import type { Brand } from '#root/src/domain.js';
 import { actorScopes } from '#root/src/tools/actors.js';
 import { repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
-export const reviewIdSchema = z.string().min(1).transform((value): ReviewId => value as ReviewId);
-export const actionIdSchema = z.string().min(1).transform((value): ActionId => value as ActionId);
-export const eventIdSchema = z.string().min(1).transform((value): EventId => value as EventId);
-export const decisionIdSchema = z
-  .string()
-  .min(1)
-  .transform((value): DecisionId => value as DecisionId);
+/**
+ * Schema for a branded domain id. The runtime validator is a plain non-empty
+ * string so it stays representable in JSON Schema: the MCP SDK serializes every
+ * tool's input and output schema during `tools/list`, and a `.transform()` here
+ * makes zod throw "Transforms cannot be represented in JSON Schema", aborting
+ * the entire list call. The brand is applied at the type level only, via the
+ * cast — consistent with the project rule that branding lives in the types, not
+ * the wire shape. Handlers receive already-validated strings typed as the
+ * branded id.
+ */
+const brandedIdSchema = <TName extends string>(): z.ZodType<Brand<TName>, Brand<TName>> =>
+  z.string().min(1) as unknown as z.ZodType<Brand<TName>, Brand<TName>>;
+
+export const reviewIdSchema = brandedIdSchema<'ReviewId'>();
+export const actionIdSchema = brandedIdSchema<'ActionId'>();
+export const eventIdSchema = brandedIdSchema<'EventId'>();
+export const decisionIdSchema = brandedIdSchema<'DecisionId'>();
 
 export const reviewStatusSchema = z
   .enum(['queued', 'blocked', 'approved', 'request_changes'])
