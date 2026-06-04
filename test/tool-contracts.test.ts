@@ -279,7 +279,7 @@ function createMockContext(): ToolExecutionContext {
           );
         }
 
-        if (request.operationName === 'add_pull_request_review_thread_reply') {
+        if (request.operationName === 'AddPullRequestReviewThreadReply') {
           return new Response(
             JSON.stringify({
               data: {
