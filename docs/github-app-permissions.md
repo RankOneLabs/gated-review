@@ -6,9 +6,9 @@ This server uses an installation token. Grant the smallest set of permissions th
 
 > **The GitHub App must be installed on every repository the server will operate on.**
 
-This server is multi-repo: agents supply `repository` on each tool call, and the server mints an installation token for that repository at call time. If the App is not installed on a target repository, the tool call fails with an authorization error. There is no partial-install fallback — the App installation is the access gate for every repository.
+This server is multi-repo: agents supply `repository` on each tool call. All requests use the single installation token configured via `GITHUB_APP_INSTALLATION_ID` — there is no per-repository token minting at call time. The repositories accessible to that installation determine what the server can reach; calls targeting a repository outside the installation's scope fail with an authorization error.
 
-Install the App once per organization or per repository as your GitHub App settings allow. A single organization-wide installation covers all repositories in that organization automatically.
+Install the App on each repository you intend to target, or use an organization-wide installation. Note that organization-wide installations only cover all repositories when configured for **All repositories**; installations scoped to **Selected repositories** cover only the explicitly listed repos.
 
 ## Minimal Recommended Set
 

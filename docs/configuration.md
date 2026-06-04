@@ -15,7 +15,7 @@ The server reads all configuration from environment variables at startup and fai
 | `GITHUB_GRAPHQL_URL` | No | `https://api.github.com/graphql` | Override for GitHub GraphQL endpoint (GitHub Enterprise). |
 | `GITHUB_COPILOT_REVIEWER_LOGIN` | No | `copilot[bot]` | Login used by `request_copilot_review`. |
 
-\* Exactly one of `GITHUB_APP_PRIVATE_KEY` or `GITHUB_APP_PRIVATE_KEY_PATH` is required.
+\* At least one is required. If both are set, `GITHUB_APP_PRIVATE_KEY` takes priority and `GITHUB_APP_PRIVATE_KEY_PATH` is ignored.
 
 ## What Is Not Here
 
