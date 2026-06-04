@@ -19,6 +19,22 @@ export type ResolveReviewThreadInput = Readonly<{
   threadId: string;
 }>;
 
+export type ReviewThreadRepositoryInput = Readonly<{
+  threadId: string;
+}>;
+
+export type ReviewThreadRepositoryResponse = Readonly<{
+  node:
+    | Readonly<{
+        pullRequest: Readonly<{
+          repository: Readonly<{
+            nameWithOwner: string;
+          }>;
+        }> | null;
+      }>
+    | null;
+}>;
+
 export type ResolveReviewThreadResponse = Readonly<{
   resolveReviewThread: Readonly<{
     thread: Readonly<{
@@ -48,6 +64,32 @@ export function addPullRequestReviewThreadReply(
     variables: {
       threadId: input.threadId,
       body: input.body
+    }
+  });
+}
+
+export function fetchReviewThreadRepository(
+  client: GitHubGraphQLClient,
+  input: ReviewThreadRepositoryInput
+): Promise<Result<ReviewThreadRepositoryResponse, GitHubError>> {
+  return client.request<ReviewThreadRepositoryResponse>({
+    operationName: 'ReviewThreadRepository',
+    requestLabel: 'POST /graphql',
+    query: `
+      query ReviewThreadRepository($threadId: ID!) {
+        node(id: $threadId) {
+          ... on PullRequestReviewThread {
+            pullRequest {
+              repository {
+                nameWithOwner
+              }
+            }
+          }
+        }
+      }
+    `,
+    variables: {
+      threadId: input.threadId
     }
   });
 }

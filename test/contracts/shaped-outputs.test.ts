@@ -24,6 +24,18 @@ import {
 
 function createMockContext(): ToolExecutionContext {
   const graphqlRequest = vi.fn(async (request: { operationName: string; query: string; variables?: Record<string, unknown> }) => {
+    if (request.operationName === 'ReviewThreadRepository') {
+      return ok({
+        node: {
+          pullRequest: {
+            repository: {
+              nameWithOwner: 'openai/gated-review'
+            }
+          }
+        }
+      });
+    }
+
     if (request.operationName === 'AddPullRequestReviewThreadReply') {
       return ok({
         addPullRequestReviewThreadReply: {

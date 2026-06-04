@@ -134,10 +134,10 @@ export async function getPrStatus(
     return openThreads;
   }
 
-  if ((openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED') && context.freshness) {
-    const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
-    context.freshness.purge(key);
-  }
+  const freshness = context.freshness;
+  const shouldPurgeFreshness =
+    freshness !== undefined &&
+    (openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED');
 
   const mergeReady = await loadMergeReadyState(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!mergeReady.ok) {
@@ -150,6 +150,11 @@ export async function getPrStatus(
   );
   if (!status.ok) {
     return err(mapGitHubError(status.error));
+  }
+
+  if (shouldPurgeFreshness) {
+    const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
+    freshness.purge(key);
   }
 
   return ok({

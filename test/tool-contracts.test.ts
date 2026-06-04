@@ -257,6 +257,28 @@ function createMockContext(): ToolExecutionContext {
     {
       fetch: async (_input, init) => {
         const request = JSON.parse(String(init?.body));
+        if (request.operationName === 'ReviewThreadRepository') {
+          return new Response(
+            JSON.stringify({
+              data: {
+                node: {
+                  pullRequest: {
+                    repository: {
+                      nameWithOwner: 'openai/gated-review'
+                    }
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
         if (request.operationName === 'add_pull_request_review_thread_reply') {
           return new Response(
             JSON.stringify({

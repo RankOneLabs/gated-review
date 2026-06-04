@@ -108,7 +108,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'open_pr',
       title: 'Open Pull Request',
-      description: 'Open a pull request in the configured repository scope. Requires repository as an owner/name slug.',
+      description: 'Open a pull request. Requires repository as an owner/name slug.',
       actorScopes: ['agent'] as const,
       inputSchemaName: 'open_pr.input',
       outputSchemaName: 'open_pr.output',

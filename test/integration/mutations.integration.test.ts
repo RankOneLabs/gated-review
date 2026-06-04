@@ -44,6 +44,20 @@ function createMockContext() {
           request
         });
 
+        if (request.operationName === 'ReviewThreadRepository') {
+          return jsonResponse({
+            data: {
+              node: {
+                pullRequest: {
+                  repository: {
+                    nameWithOwner: 'openai/gated-review'
+                  }
+                }
+              }
+            }
+          });
+        }
+
         if (request.operationName === 'AddPullRequestReviewThreadReply') {
           return jsonResponse({
             data: {

@@ -16,6 +16,8 @@ import type { ZodTypeAny } from 'zod';
 
 import type { ToolContract } from '#root/src/tools/types.js';
 
+let loggedAgentToolStartup = false;
+
 function createToolHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
   return async (input: unknown) => {
     const parsedInput = tool.inputSchema.safeParse(input);
@@ -85,11 +87,16 @@ export function createServer(context: ToolExecutionContext) {
     tool.actorScopes.some((scope) => scope === 'agent')
   );
 
-  const agentToolNames = agentTools.map((tool) => tool.name);
-  console.info('[gated-review] server.start', {
-    operation: 'server.start',
-    detail: `agent tools: ${agentToolNames.join(', ')}`
-  });
+  // createServer() runs per HTTP MCP session; log the agent tool surface once
+  // per process so multi-client usage doesn't flood the logs with identical lines.
+  if (!loggedAgentToolStartup) {
+    const agentToolNames = agentTools.map((tool) => tool.name);
+    console.info('[gated-review] server.start', {
+      operation: 'server.start',
+      detail: `agent tools: ${agentToolNames.join(', ')}`
+    });
+    loggedAgentToolStartup = true;
+  }
 
   for (const tool of agentTools) {
     server.registerTool(
