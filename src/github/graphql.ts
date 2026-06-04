@@ -3,6 +3,7 @@ import { createGitHubError, type GitHubError } from '#root/src/github/errors.js'
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { GitHubFetch } from '#root/src/github/fetch.js';
 import { readGitHubErrorMessage } from '#root/src/github/response-error.js';
+import type { GitHubRepositoryScope, InstallationIdResolver } from '#root/src/github/rest.js';
 
 export type GitHubGraphQLPrimitive = string | number | boolean | null;
 export type GitHubGraphQLValue = GitHubGraphQLPrimitive | ReadonlyArray<unknown> | Readonly<Record<string, unknown>>;
@@ -15,6 +16,8 @@ export type GitHubGraphQLRequest<TData, TVariables extends GitHubGraphQLVariable
     requestLabel: string;
     query: string;
     variables?: TVariables;
+    /** Repository whose owner selects the App installation; falls back to the fixed id when absent. */
+    repository?: GitHubRepositoryScope;
   }>;
 
 export type GitHubGraphQLErrorEntry = Readonly<{
@@ -40,7 +43,8 @@ export type GitHubGraphQLClientDependencies = {
 
 export type GitHubGraphQLClientOptions = {
   graphqlUrl: string;
-  installationId: number;
+  installationId?: number;
+  resolveInstallationId?: InstallationIdResolver;
   tokenProvider: GitHubInstallationTokenProvider;
 };
 
@@ -59,11 +63,35 @@ export function createGitHubGraphQLClient(
 ): GitHubGraphQLClient {
   const fetchFn: GitHubFetch = dependencies.fetch ?? globalThis.fetch;
 
+  async function resolveInstallationId(
+    repository?: GitHubRepositoryScope
+  ): Promise<Result<number, GitHubError>> {
+    if (repository !== undefined && options.resolveInstallationId !== undefined) {
+      return options.resolveInstallationId(repository.owner, repository.repo);
+    }
+    if (options.installationId !== undefined) {
+      return ok(options.installationId);
+    }
+    return err(
+      createGitHubError({
+        category: 'configuration',
+        operation: 'resolve_installation',
+        requestLabel: 'installation routing',
+        message: 'No installation routing configured: set an installation resolver or a fixed installation id.'
+      })
+    );
+  }
+
   return {
     async request<TData, TVariables extends GitHubGraphQLVariables = GitHubGraphQLVariables>(
       request: GitHubGraphQLRequest<TData, TVariables>
     ) {
-      const token = await options.tokenProvider.getInstallationToken(options.installationId);
+      const installationId = await resolveInstallationId(request.repository);
+      if (!installationId.ok) {
+        return err(installationId.error);
+      }
+
+      const token = await options.tokenProvider.getInstallationToken(installationId.value);
       if (!token.ok) {
         return err(token.error);
       }

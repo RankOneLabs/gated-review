@@ -14,6 +14,7 @@ export type GitHubInstallationToken = {
 
 export type GitHubAppAuth = {
   mintInstallationToken(installationId: number): Promise<Result<GitHubInstallationToken, GitHubError>>;
+  lookupInstallationId(owner: string, repo: string): Promise<Result<number, GitHubError>>;
 };
 
 export type GitHubAppAuthDependencies = {
@@ -28,6 +29,16 @@ type GitHubInstallationTokenResponse = {
 
 function encodeBase64Url(value: string) {
   return Buffer.from(value, 'utf8').toString('base64url');
+}
+
+function appJwtHeaders(jwt: string) {
+  return {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${jwt}`,
+    'Content-Type': 'application/json',
+    'User-Agent': 'gated-review',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
 }
 
 function createJwt(privateKey: ReturnType<typeof createPrivateKey>, appId: number, nowMs: number) {
@@ -141,13 +152,7 @@ export function createGitHubAppAuth(
       try {
         response = await fetchFn(url, {
           method: 'POST',
-          headers: {
-            Accept: 'application/vnd.github+json',
-            Authorization: `Bearer ${jwt}`,
-            'Content-Type': 'application/json',
-            'User-Agent': 'gated-review',
-            'X-GitHub-Api-Version': '2022-11-28'
-          },
+          headers: appJwtHeaders(jwt),
           body: '{}'
         });
       } catch (error: unknown) {
@@ -200,6 +205,79 @@ export function createGitHubAppAuth(
         token: parsed.value.token,
         expiresAt: new Date(parsed.value.expires_at)
       });
+    },
+    async lookupInstallationId(owner: string, repo: string) {
+      const jwt = createJwt(privateKey, config.appId, now());
+      const requestLabel = `GET /repos/${owner}/${repo}/installation`;
+      const url = resolveGitHubUrl(config.apiBaseUrl, `repos/${owner}/${repo}/installation`);
+
+      let response: Response;
+      try {
+        response = await fetchFn(url, {
+          method: 'GET',
+          headers: appJwtHeaders(jwt)
+        });
+      } catch (error: unknown) {
+        const detail = error instanceof Error ? error.message : String(error);
+        return err(
+          createGitHubError({
+            category: 'transport',
+            operation: 'lookup_installation_id',
+            requestLabel,
+            message: `GitHub installation lookup failed: ${detail}`
+          })
+        );
+      }
+
+      if (!response.ok) {
+        const message =
+          response.status === 404
+            ? `GitHub App is not installed on ${owner} (or lacks access to ${owner}/${repo}).`
+            : await readSafeResponseMessage(response);
+        return err(
+          createGitHubError({
+            category: 'authentication',
+            operation: 'lookup_installation_id',
+            requestLabel,
+            status: response.status,
+            message
+          })
+        );
+      }
+
+      let body: unknown;
+      try {
+        body = (await response.json()) as unknown;
+      } catch (error: unknown) {
+        const detail = error instanceof Error ? error.message : String(error);
+        return err(
+          createGitHubError({
+            category: 'authentication',
+            operation: 'lookup_installation_id',
+            requestLabel,
+            status: response.status,
+            message: `GitHub returned an invalid installation payload: ${detail}`
+          })
+        );
+      }
+
+      const id =
+        typeof body === 'object' && body !== null
+          ? (body as Record<string, unknown>).id
+          : undefined;
+      if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
+        return err(
+          createGitHubError({
+            category: 'authentication',
+            operation: 'lookup_installation_id',
+            requestLabel,
+            status: response.status,
+            message: 'GitHub installation lookup response was missing a numeric id.'
+          })
+        );
+      }
+
+      return ok(id);
     }
   });
 }

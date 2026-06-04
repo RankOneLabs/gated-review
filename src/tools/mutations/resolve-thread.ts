@@ -52,7 +52,8 @@ export function createResolveThreadHandler(context: ToolExecutionContext) {
     }
 
     const result = await resolveReviewThread(context.github.graphql, {
-      threadId: parsedInput.threadId
+      threadId: parsedInput.threadId,
+      repository: { owner: repoRef.value.owner, repo: repoRef.value.repo }
     });
 
     if (!result.ok) {

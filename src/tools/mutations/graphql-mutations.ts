@@ -1,10 +1,12 @@
 import type { GitHubGraphQLClient } from '#root/src/github/graphql.js';
+import type { GitHubRepositoryScope } from '#root/src/github/rest.js';
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { Result } from '#root/src/result.js';
 
 export type AddPullRequestReviewThreadReplyInput = Readonly<{
   threadId: string;
   body: string;
+  repository?: GitHubRepositoryScope;
 }>;
 
 export type AddPullRequestReviewThreadReplyResponse = Readonly<{
@@ -17,10 +19,12 @@ export type AddPullRequestReviewThreadReplyResponse = Readonly<{
 
 export type ResolveReviewThreadInput = Readonly<{
   threadId: string;
+  repository?: GitHubRepositoryScope;
 }>;
 
 export type ReviewThreadRepositoryInput = Readonly<{
   threadId: string;
+  repository?: GitHubRepositoryScope;
 }>;
 
 export type ReviewThreadRepositoryResponse = Readonly<{
@@ -64,7 +68,8 @@ export function addPullRequestReviewThreadReply(
     variables: {
       threadId: input.threadId,
       body: input.body
-    }
+    },
+    repository: input.repository
   });
 }
 
@@ -90,7 +95,8 @@ export function fetchReviewThreadRepository(
     `,
     variables: {
       threadId: input.threadId
-    }
+    },
+    repository: input.repository
   });
 }
 
@@ -112,6 +118,7 @@ export function resolveReviewThread(
     `,
     variables: {
       threadId: input.threadId
-    }
+    },
+    repository: input.repository
   });
 }

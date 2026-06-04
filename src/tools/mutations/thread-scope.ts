@@ -21,7 +21,10 @@ export async function enforceThreadRepository(
 ): Promise<Result<true, ToolDomainError>> {
   const requestedRepository = `${repoRef.owner}/${repoRef.repo}`;
 
-  const lookup = await fetchReviewThreadRepository(client, { threadId });
+  const lookup = await fetchReviewThreadRepository(client, {
+    threadId,
+    repository: { owner: repoRef.owner, repo: repoRef.repo }
+  });
   if (!lookup.ok) {
     const error = mapGitHubError(operation, lookup.error);
     console.warn('[gated-review] thread scope lookup failed', {

@@ -17,6 +17,9 @@ describe('GitHub installation token cache', () => {
           expiresAt: new Date(now + 120_000)
         };
         return ok(token);
+      },
+      async lookupInstallationId() {
+        return ok(1);
       }
     };
 
@@ -56,6 +59,9 @@ describe('GitHub installation token cache', () => {
           token: `token-${installationId}`,
           expiresAt: new Date(Date.now() + 120_000)
         });
+      },
+      async lookupInstallationId() {
+        return ok(1);
       }
     };
 

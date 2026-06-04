@@ -1,5 +1,6 @@
 import { createGitHubAppAuth } from '#root/src/auth/github-app.js';
 import { GitHubInstallationTokenCache } from '#root/src/auth/token-cache.js';
+import { GitHubInstallationResolver } from '#root/src/auth/installation-resolver.js';
 import { loadGitHubAppConfig } from '#root/src/config.js';
 import { validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import { err, ok, type Result } from '#root/src/result.js';
@@ -32,8 +33,14 @@ async function loadDefaultGitRunnerDependencies(): Promise<Result<GitRunnerDepen
     return err(toRuntimeError(auth.error.message));
   }
 
+  const resolver = new GitHubInstallationResolver(auth.value);
+
   return ok({
     installationId: config.value.installationId,
+    resolveInstallationId:
+      config.value.installationId === undefined
+        ? (owner, repo) => resolver.resolveInstallationId(owner, repo)
+        : undefined,
     tokenProvider: new GitHubInstallationTokenCache(auth.value),
     githubHosts: deriveGitHubHosts(config.value.apiBaseUrl)
   });

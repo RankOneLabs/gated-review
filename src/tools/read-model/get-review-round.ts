@@ -86,7 +86,8 @@ async function requestReviewThreadsPage(
       repo: repository.repo,
       number: pullRequestNumber,
       after
-    }
+    },
+    repository: { owner: repository.owner, repo: repository.repo }
   });
 
   if (!response.ok) {
@@ -98,6 +99,7 @@ async function requestReviewThreadsPage(
 
 async function loadThreadCommentsBatched(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   threadIds: ReadonlyArray<string>,
   batchSize = 4
 ): Promise<Result<ReadonlyArray<ReadModelThreadComment[]>, ToolDomainError>> {
@@ -105,7 +107,9 @@ async function loadThreadCommentsBatched(
 
   for (let index = 0; index < threadIds.length; index += batchSize) {
     const batch = threadIds.slice(index, index + batchSize);
-    const batchResults = await Promise.all(batch.map((threadId) => loadThreadComments(context, threadId)));
+    const batchResults = await Promise.all(
+      batch.map((threadId) => loadThreadComments(context, repository, threadId))
+    );
 
     for (const result of batchResults) {
       if (!result.ok) {
@@ -121,6 +125,7 @@ async function loadThreadCommentsBatched(
 
 async function requestThreadCommentsPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   threadId: string,
   after: string | null
 ): Promise<Result<GraphQLReviewThreadCommentsQueryData, ToolDomainError>> {
@@ -131,7 +136,8 @@ async function requestThreadCommentsPage(
     variables: {
       id: threadId,
       after
-    }
+    },
+    repository: { owner: repository.owner, repo: repository.repo }
   });
 
   if (!response.ok) {
@@ -156,7 +162,8 @@ async function requestSummaryCommentsPage(
       repo: repository.repo,
       number: pullRequestNumber,
       after
-    }
+    },
+    repository: { owner: repository.owner, repo: repository.repo }
   });
 
   if (!response.ok) {
@@ -168,13 +175,14 @@ async function requestSummaryCommentsPage(
 
 async function loadThreadComments(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   threadId: string
 ): Promise<Result<ReadModelThreadComment[], ToolDomainError>> {
   const comments: Array<ReadModelThreadComment> = [];
   let after: string | null = null;
 
   while (true) {
-    const page = await requestThreadCommentsPage(context, threadId, after);
+    const page = await requestThreadCommentsPage(context, repository, threadId, after);
     if (!page.ok) {
       return page;
     }
@@ -334,6 +342,7 @@ export async function getReviewRound(
 
   const comments = await loadThreadCommentsBatched(
     context,
+    repoRef.value,
     threads.map((thread) => thread.id)
   );
   if (!comments.ok) {
