@@ -19,6 +19,8 @@ Agent-facing tools:
 - `reply_to_thread`
 - `resolve_thread`
 - `request_next_round`
+- `review.get_state` _(stub — registered on the surface but not yet implemented; always returns not-implemented)_
+- `review.list_actions` _(stub — registered on the surface but not yet implemented; always returns not-implemented)_
 
 Operator-only tools are physically absent from the agent-facing MCP surface —
 they are never registered, not merely hidden behind a runtime check:
