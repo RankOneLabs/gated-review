@@ -12,10 +12,11 @@ The server speaks **Streamable HTTP MCP** (spec §4). Every MCP interaction goes
 http://willie:3555/mcp
 ```
 
-Clients POST to `/mcp` to initialize a session; the server responds with an
-`mcp-session-id` header. Subsequent requests must include that header — the server
-returns `404 Session not found` without it. No TLS termination, no reverse proxy —
-direct port access over the Tailscale tailnet, consistent with homelab conventions.
+Clients POST to `/mcp` without a session header to initialize a new session; the server
+responds with an `mcp-session-id` header. All subsequent requests for that session must
+include the header — the server returns `404 Session not found` when the header is
+present but the session ID is unknown. No TLS termination, no reverse proxy — direct
+port access over the Tailscale tailnet, consistent with homelab conventions.
 
 ## Willie compose service
 
