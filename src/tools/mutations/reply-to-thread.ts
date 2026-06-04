@@ -9,11 +9,11 @@ import {
   type AddPullRequestReviewThreadReplyInput
 } from '#root/src/tools/mutations/graphql-mutations.js';
 import { enforceThreadRepository } from '#root/src/tools/mutations/thread-scope.js';
-import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
+import { parseRepoSlug, repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const replyToThreadInputSchema = z
   .object({
-    repository: z.string().min(1),
+    repository: repositorySlugSchema,
     threadId: z.string().min(1),
     body: z.string().min(1)
   })

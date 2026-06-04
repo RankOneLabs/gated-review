@@ -6,11 +6,11 @@ import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
 import { resolveReviewThread } from '#root/src/tools/mutations/graphql-mutations.js';
 import { enforceThreadRepository } from '#root/src/tools/mutations/thread-scope.js';
-import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
+import { parseRepoSlug, repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const resolveThreadInputSchema = z
   .object({
-    repository: z.string().min(1),
+    repository: repositorySlugSchema,
     threadId: z.string().min(1)
   })
   .strict()

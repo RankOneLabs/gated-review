@@ -4,11 +4,11 @@ import { validationRejectedError, type ToolDomainError } from '#root/src/errors.
 import { err, ok, type Result } from '#root/src/result.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { mapGitHubError } from '#root/src/tools/mutations/errors.js';
-import { parseRepoSlug } from '#root/src/tools/repository-ref.js';
+import { parseRepoSlug, repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const openPrInputSchema = z
   .object({
-    repository: z.string().min(1),
+    repository: repositorySlugSchema,
     base: z.string().min(1),
     head: z.string().min(1),
     title: z.string().min(1),
