@@ -7,7 +7,7 @@ rounds, decide when the loop is done, or mark a pull request merge-ready.
 ## What the Server Does Hold
 
 The server holds one bounded, non-policy piece of per-PR state: a **delivery
-cursor** (`lastDelivered` watermark) that records the latest comment timestamp
+cursor** (`lastDelivered` watermark) that records the latest review-thread comment timestamp
 seen on the last `get_review_round` call. This cursor drives the
 `hasFreshComments` annotation and is described fully in
 [docs/freshness-model.md](freshness-model.md).

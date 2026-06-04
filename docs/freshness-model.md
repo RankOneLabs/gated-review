@@ -12,7 +12,7 @@ A thread is unresolved when GitHub's `isResolved` flag is false. The agent sees 
 
 ### 2. `lastDelivered` watermark (ergonomics axis)
 
-The server records the latest `createdAt` timestamp seen across all thread comments returned by a `get_review_round` call. On subsequent calls for the same PR, threads whose most recent comment is newer than that watermark are flagged `hasFreshComments: true`. This lets the agent skip threads it has already seen and acted on, rather than re-reading the entire comment history each round.
+The server records the latest `createdAt` timestamp seen across all review-thread comments returned by a `get_review_round` call. Summary comments (issue comments from CodeRabbit or Copilot) are returned in the response but do not advance the watermark. On subsequent calls for the same PR, threads whose most recent comment is newer than that watermark are flagged `hasFreshComments: true`. This lets the agent skip threads it has already seen and acted on, rather than re-reading the entire comment history each round.
 
 `freshSince` in the `get_review_round` response is the watermark value that was in effect when that call was made. It is null on the first call for a PR.
 
