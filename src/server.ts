@@ -155,6 +155,11 @@ export async function runHttpServer() {
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
+        // Every gated-review tool is a bounded request/response — nothing streams and no
+        // tool emits mid-call progress — so reply in plain application/json rather than SSE
+        // frames. Clients must still advertise text/event-stream in Accept per the MCP spec
+        // (the SDK enforces this); this only changes how unary responses are encoded.
+        enableJsonResponse: true,
         onsessioninitialized: (id) => {
           sessions.set(id, transport);
         },
