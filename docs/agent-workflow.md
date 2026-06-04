@@ -20,7 +20,8 @@ Agent-facing tools:
 - `resolve_thread`
 - `request_next_round`
 
-Operator-only tools are intentionally unavailable to the agent:
+Operator-only tools are physically absent from the agent-facing MCP surface —
+they are never registered, not merely hidden behind a runtime check:
 
 - `request_copilot_review`
 - `mark_merge_ready`
@@ -29,11 +30,24 @@ Operator-only tools are intentionally unavailable to the agent:
 The agent must not try to recreate those operations through another GitHub
 surface.
 
+## Repository Argument
+
+Every tool that targets a repository or pull request accepts a `repository`
+argument in `owner/name` form. The server is multi-repo: there is no
+repository pinned at startup. The agent must supply `repository` on every
+call — `pr_status`, `get_review_round`, `open_pr`, `git.push`, and all
+mutation tools.
+
+The App installation must cover every repository the agent calls. If it does
+not, the tool returns an authorization error. See
+[docs/github-app-permissions.md](github-app-permissions.md).
+
 ## Opening A PR
 
 1. Make local changes with normal local git commands.
 2. Commit locally.
-3. Push through `git.push` so remote credentials stay behind the server.
+3. Push through `git.push` (with `repository`) so remote credentials stay
+   behind the server.
 4. Open the pull request with `open_pr`.
 
 Local-only git operations such as staging, committing, branching, merging, and
@@ -52,6 +66,27 @@ context, but `pr_status` is not a gate.
 
 The agent should wait for operator-approved triage outcomes before applying
 review-thread mutations.
+
+## Freshness and the Resolve Discipline
+
+`get_review_round` returns two freshness signals:
+
+- **`hasFreshComments`** on each thread: true when the thread has comments
+  newer than the `lastDelivered` watermark recorded by the server after the
+  previous call. Threads with `hasFreshComments: false` have already been
+  delivered; the agent may skip their body on re-reads.
+- **`freshSince`**: the watermark timestamp that was in effect when this call
+  was made. Null on the first call for a PR.
+
+The resolve discipline is the mechanism that keeps the watermark meaningful:
+**the agent must call `resolve_thread` when a thread is actually addressed**.
+If the agent resolves threads promptly after each approved outcome, the
+watermark accurately separates already-handled threads from newly arrived ones
+on the next round. If the agent skips resolution, all threads continue to
+appear fresh on every call.
+
+See [docs/freshness-model.md](freshness-model.md) for a full explanation of
+how the watermark is produced and its in-memory storage model.
 
 ## Applying Approved Outcomes
 
