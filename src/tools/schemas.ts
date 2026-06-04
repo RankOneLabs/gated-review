@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ActionId, DecisionId, EventId, ReviewId } from '#root/src/domain.js';
 import { actorScopes } from '#root/src/tools/actors.js';
+import { repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const reviewIdSchema = z.string().min(1).transform((value): ReviewId => value as ReviewId);
 export const actionIdSchema = z.string().min(1).transform((value): ActionId => value as ActionId);
@@ -109,6 +110,7 @@ export const reviewDecisionOutputSchema = z
 
 export const requestCopilotReviewInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     pullRequestNumber: z.number().int().positive()
   })
   .strict()
@@ -123,6 +125,7 @@ export const requestCopilotReviewOutputSchema = z
 
 export const markMergeReadyInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     pullRequestNumber: z.number().int().positive(),
     ready: z.boolean()
   })
@@ -142,6 +145,7 @@ export const mergePrMergeMethodSchema = z
 
 export const mergePrInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     pullRequestNumber: z.number().int().positive(),
     mergeMethod: mergePrMergeMethodSchema,
     commitTitle: z.string().min(1).optional(),
@@ -185,6 +189,7 @@ export const readModelReviewThreadSchema = z
     state: readModelThreadStateSchema,
     path: z.string().min(1).nullable(),
     line: z.number().int().nullable(),
+    hasFreshComments: z.boolean(),
     comments: z.array(readModelThreadCommentSchema)
   })
   .strict();
@@ -225,6 +230,7 @@ export const mergeReadyStateSchema = z
 
 export const getReviewRoundInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     pullRequestNumber: z.number().int().positive(),
     includeResolved: z.boolean().optional()
   })
@@ -236,6 +242,7 @@ export const getReviewRoundOutputSchema = z
     pullRequestNumber: z.number().int().positive(),
     includeResolved: z.boolean(),
     openThreadCount: z.number().int().nonnegative(),
+    freshSince: z.string().datetime().nullable(),
     threads: z.array(readModelReviewThreadSchema),
     summaries: z.array(readModelSummaryCommentSchema)
   })
@@ -244,6 +251,7 @@ export const getReviewRoundOutputSchema = z
 
 export const prStatusInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     pullRequestNumber: z.number().int().positive()
   })
   .strict()

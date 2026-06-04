@@ -1,21 +1,20 @@
 import type { GitHubClient } from '#root/src/github/client.js';
-import type { GitHubRepositoryScope } from '#root/src/github/rest.js';
 import { loadGitHubAppConfig, type GitHubConfigEnvironment } from '#root/src/config.js';
 import { createGitHubClient } from '#root/src/github/client.js';
-import { resolveRepositoryScope } from '#root/src/tools/mutations/repository.js';
+import type { FreshnessStore } from '#root/src/tools/freshness-store.js';
 
 export type ToolExecutionContext = Readonly<{
   github: GitHubClient;
-  repository: GitHubRepositoryScope;
   copilotReviewerLogin: string;
+  freshness?: FreshnessStore;
 }>;
 
 export function createToolExecutionContext(
   github: GitHubClient,
-  repository: GitHubRepositoryScope,
-  copilotReviewerLogin = 'copilot[bot]'
+  copilotReviewerLogin = 'copilot[bot]',
+  freshness?: FreshnessStore
 ): ToolExecutionContext {
-  return { github, repository, copilotReviewerLogin };
+  return { github, copilotReviewerLogin, freshness };
 }
 
 export async function loadToolExecutionContext(
@@ -31,10 +30,5 @@ export async function loadToolExecutionContext(
     throw new Error(github.error.message);
   }
 
-  const repository = await resolveRepositoryScope(env);
-  if (!repository.ok) {
-    throw new Error(repository.error.detail);
-  }
-
-  return createToolExecutionContext(github.value, repository.value, config.value.copilotReviewerLogin);
+  return createToolExecutionContext(github.value, config.value.copilotReviewerLogin);
 }

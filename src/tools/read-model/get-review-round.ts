@@ -3,11 +3,14 @@ import { githubRequestFailedError, validationRejectedError, type ToolDomainError
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { getReviewRoundInputSchema } from '#root/src/tools/schemas.js';
+import { parseRepoSlug, type RepositoryRef } from '#root/src/tools/repository-ref.js';
 import { tagEntity } from '#root/src/tools/read-model/entity.js';
+import { makeRepoPrKey } from '#root/src/tools/freshness-store.js';
 import {
   reviewRoundSummariesQuery,
   reviewRoundThreadsQuery,
   reviewThreadCommentsQuery,
+  type GraphQLPrState,
   type GraphQLReviewCommentNode,
   type GraphQLReviewRoundIssueCommentNode,
   type GraphQLReviewRoundSummariesQueryData,
@@ -70,6 +73,7 @@ function toSummaryComment(
 
 async function requestReviewThreadsPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number,
   after: string | null
 ): Promise<Result<GraphQLReviewRoundThreadsQueryData, ToolDomainError>> {
@@ -78,8 +82,8 @@ async function requestReviewThreadsPage(
     requestLabel: graphqlRequestLabel,
     query: reviewRoundThreadsQuery,
     variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
+      owner: repository.owner,
+      repo: repository.repo,
       number: pullRequestNumber,
       after
     }
@@ -139,6 +143,7 @@ async function requestThreadCommentsPage(
 
 async function requestSummaryCommentsPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number,
   after: string | null
 ): Promise<Result<GraphQLReviewRoundSummariesQueryData, ToolDomainError>> {
@@ -147,8 +152,8 @@ async function requestSummaryCommentsPage(
     requestLabel: graphqlRequestLabel,
     query: reviewRoundSummariesQuery,
     variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
+      owner: repository.owner,
+      repo: repository.repo,
       number: pullRequestNumber,
       after
     }
@@ -204,13 +209,14 @@ async function loadThreadComments(
 
 async function loadSummaryComments(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number
 ): Promise<Result<ReadModelSummaryComment[], ToolDomainError>> {
   const summaries: Array<ReadModelSummaryComment> = [];
   let after: string | null = null;
 
   while (true) {
-    const page = await requestSummaryCommentsPage(context, pullRequestNumber, after);
+    const page = await requestSummaryCommentsPage(context, repository, pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -248,6 +254,12 @@ async function loadSummaryComments(
   return ok(summaries);
 }
 
+function isThreadFresh(comments: ReadModelThreadComment[], prior: string | null): boolean {
+  if (prior === null) return true;
+  const priorMs = Date.parse(prior);
+  return comments.some((c) => Date.parse(c.createdAt) > priorMs);
+}
+
 export async function getReviewRound(
   input: unknown,
   context: ToolExecutionContext
@@ -258,6 +270,11 @@ export async function getReviewRound(
   }
 
   const parsedInput = parsed.data;
+  const repoRef = parseRepoSlug(parsedInput.repository);
+  if (!repoRef.ok) {
+    return err(validationRejectedError(operationName, repoRef.error.detail));
+  }
+
   const threads: Array<{
     id: string;
     state: 'open' | 'resolved';
@@ -265,10 +282,11 @@ export async function getReviewRound(
     line: number | null;
   }> = [];
   let openThreadCount = 0;
+  let prState: GraphQLPrState | null = null;
   let after: string | null = null;
 
   while (true) {
-    const page = await requestReviewThreadsPage(context, parsedInput.pullRequestNumber, after);
+    const page = await requestReviewThreadsPage(context, repoRef.value, parsedInput.pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -278,6 +296,10 @@ export async function getReviewRound(
       return err(
         githubRequestFailedError(operationName, `Pull request #${parsedInput.pullRequestNumber} was not found.`)
       );
+    }
+
+    if (prState === null) {
+      prState = pullRequest.state;
     }
 
     for (const thread of pullRequest.reviewThreads.nodes) {
@@ -318,19 +340,49 @@ export async function getReviewRound(
     return comments;
   }
 
-  const summaries = await loadSummaryComments(context, parsedInput.pullRequestNumber);
+  const summaries = await loadSummaryComments(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!summaries.ok) {
     return summaries;
+  }
+
+  const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
+  const prior = context.freshness?.lastDeliveredAt(key) ?? null;
+
+  let maxCreatedAt: string | null = null;
+  let maxCreatedAtMs = -Infinity;
+  for (const threadComments of comments.value) {
+    for (const comment of threadComments) {
+      const ms = Date.parse(comment.createdAt);
+      if (ms > maxCreatedAtMs) {
+        maxCreatedAtMs = ms;
+        maxCreatedAt = comment.createdAt;
+      }
+    }
+  }
+
+  if (maxCreatedAt !== null && context.freshness) {
+    context.freshness.record(key, maxCreatedAt);
+  }
+
+  if ((prState === 'CLOSED' || prState === 'MERGED') && context.freshness) {
+    context.freshness.purge(key);
   }
 
   return ok({
     pullRequestNumber: parsedInput.pullRequestNumber,
     includeResolved: parsedInput.includeResolved ?? false,
     openThreadCount,
-    threads: threads.map((thread, index) => ({
-      ...thread,
-      comments: comments.value[index]
-    })),
+    freshSince: prior,
+    threads: threads.map((thread, index) => {
+      const threadComments = comments.value[index];
+      const hasFreshComments =
+        thread.state === 'resolved' ? false : isThreadFresh(threadComments, prior);
+      return {
+        ...thread,
+        hasFreshComments,
+        comments: threadComments
+      };
+    }),
     summaries: summaries.value
   });
 }

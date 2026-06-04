@@ -50,6 +50,7 @@ const inputFixtures: Readonly<Record<string, unknown>> = {
     reason: 'policy satisfied'
   },
   open_pr: {
+    repository: 'openai/gated-review',
     base: 'main',
     head: 'feature-branch',
     title: 'Add feature',
@@ -57,23 +58,29 @@ const inputFixtures: Readonly<Record<string, unknown>> = {
     draft: true
   },
   reply_to_thread: {
+    repository: 'openai/gated-review',
     threadId: 'thread-123',
     body: 'Acknowledged'
   },
   resolve_thread: {
+    repository: 'openai/gated-review',
     threadId: 'thread-123'
   },
   request_next_round: {
+    repository: 'openai/gated-review',
     pullRequestNumber: 17
   },
   request_copilot_review: {
+    repository: 'openai/gated-review',
     pullRequestNumber: 42
   },
   mark_merge_ready: {
+    repository: 'openai/gated-review',
     pullRequestNumber: 42,
     ready: true
   },
   merge_pr: {
+    repository: 'openai/gated-review',
     pullRequestNumber: 42,
     mergeMethod: 'squash',
     commitTitle: 'Merge pull request #42',
@@ -81,9 +88,11 @@ const inputFixtures: Readonly<Record<string, unknown>> = {
     sha: 'head-sha-123'
   },
   get_review_round: {
+    repository: 'openai/gated-review',
     pullRequestNumber: 42
   },
   pr_status: {
+    repository: 'openai/gated-review',
     pullRequestNumber: 42
   }
 };
@@ -248,7 +257,29 @@ function createMockContext(): ToolExecutionContext {
     {
       fetch: async (_input, init) => {
         const request = JSON.parse(String(init?.body));
-        if (request.operationName === 'add_pull_request_review_thread_reply') {
+        if (request.operationName === 'ReviewThreadRepository') {
+          return new Response(
+            JSON.stringify({
+              data: {
+                node: {
+                  pullRequest: {
+                    repository: {
+                      nameWithOwner: 'openai/gated-review'
+                    }
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (request.operationName === 'AddPullRequestReviewThreadReply') {
           return new Response(
             JSON.stringify({
               data: {
@@ -274,6 +305,7 @@ function createMockContext(): ToolExecutionContext {
               data: {
                 repository: {
                   pullRequest: {
+                    state: 'OPEN',
                     reviewThreads: {
                       nodes: [
                         {
@@ -375,6 +407,7 @@ function createMockContext(): ToolExecutionContext {
               data: {
                 repository: {
                   pullRequest: {
+                    state: 'OPEN',
                     headRefOid: 'head-sha-123',
                     reviewThreads: {
                       nodes: [
@@ -454,7 +487,6 @@ function createMockContext(): ToolExecutionContext {
       graphql,
       rest
     },
-    repository: { owner: 'openai', repo: 'gated-review' },
     copilotReviewerLogin: 'github-copilot[bot]'
   };
 }
@@ -568,7 +600,8 @@ describe('tool contracts', () => {
   });
 
   it('accepts shaped payloads for the read-model tools', () => {
-    expect(getReviewRoundInputSchema.parse({ pullRequestNumber: 42 })).toEqual({
+    expect(getReviewRoundInputSchema.parse({ repository: 'openai/gated-review', pullRequestNumber: 42 })).toEqual({
+      repository: 'openai/gated-review',
       pullRequestNumber: 42
     });
     expect(
@@ -576,12 +609,14 @@ describe('tool contracts', () => {
         pullRequestNumber: 42,
         includeResolved: false,
         openThreadCount: 1,
+        freshSince: null,
         threads: [
           {
             id: 'thread-1',
             state: 'open',
             path: 'src/open.ts',
             line: 12,
+            hasFreshComments: true,
             comments: [
               {
                 id: 'comment-1',
@@ -611,12 +646,14 @@ describe('tool contracts', () => {
       pullRequestNumber: 42,
       includeResolved: false,
       openThreadCount: 1,
+      freshSince: null,
       threads: [
         {
           id: 'thread-1',
           state: 'open',
           path: 'src/open.ts',
           line: 12,
+          hasFreshComments: true,
           comments: [
             {
               id: 'comment-1',
@@ -643,7 +680,8 @@ describe('tool contracts', () => {
       ]
     });
 
-    expect(prStatusInputSchema.parse({ pullRequestNumber: 42 })).toEqual({
+    expect(prStatusInputSchema.parse({ repository: 'openai/gated-review', pullRequestNumber: 42 })).toEqual({
+      repository: 'openai/gated-review',
       pullRequestNumber: 42
     });
     expect(
@@ -682,17 +720,20 @@ describe('tool contracts', () => {
   });
 
   it('keeps the operator tool schemas shaped for merge control', () => {
-    expect(requestCopilotReviewInputSchema.parse({ pullRequestNumber: 42 })).toEqual({
+    expect(requestCopilotReviewInputSchema.parse({ repository: 'openai/gated-review', pullRequestNumber: 42 })).toEqual({
+      repository: 'openai/gated-review',
       pullRequestNumber: 42
     });
     expect(requestCopilotReviewOutputSchema.parse({ ok: true })).toEqual({ ok: true });
 
     expect(
       markMergeReadyInputSchema.parse({
+        repository: 'openai/gated-review',
         pullRequestNumber: 42,
         ready: true
       })
     ).toEqual({
+      repository: 'openai/gated-review',
       pullRequestNumber: 42,
       ready: true
     });
@@ -700,6 +741,7 @@ describe('tool contracts', () => {
 
     expect(
       mergePrInputSchema.parse({
+        repository: 'openai/gated-review',
         pullRequestNumber: 42,
         mergeMethod: 'squash',
         commitTitle: 'Merge pull request #42',
@@ -707,6 +749,7 @@ describe('tool contracts', () => {
         sha: 'head-sha-123'
       })
     ).toEqual({
+      repository: 'openai/gated-review',
       pullRequestNumber: 42,
       mergeMethod: 'squash',
       commitTitle: 'Merge pull request #42',
@@ -792,12 +835,14 @@ describe('tool contracts', () => {
             pullRequestNumber: 42,
             includeResolved: false,
             openThreadCount: 1,
+            freshSince: null,
             threads: [
               {
                 id: 'thread-open',
                 state: 'open',
                 path: 'src/open.ts',
                 line: 12,
+                hasFreshComments: true,
                 comments: [
                   {
                     id: 'comment-1',

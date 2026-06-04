@@ -1,5 +1,8 @@
+import { createServer as createHttpServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { createGitHubClient } from '#root/src/github/client.js';
 import { loadGitHubAppConfig } from '#root/src/config.js';
@@ -7,11 +10,13 @@ import { describeToolError, validationRejectedError } from '#root/src/errors.js'
 import { isOk } from '#root/src/result.js';
 import { createToolRegistry } from '#root/src/tools/registry.js';
 import { createToolExecutionContext, type ToolExecutionContext } from '#root/src/tools/context.js';
-import { resolveRepositoryScope } from '#root/src/tools/mutations/repository.js';
+import { createInMemoryFreshnessStore } from '#root/src/tools/freshness-store.js';
 import { reviewDecisionOutputSchema } from '#root/src/tools/schemas.js';
 import type { ZodTypeAny } from 'zod';
 
 import type { ToolContract } from '#root/src/tools/types.js';
+
+let loggedAgentToolStartup = false;
 
 function createToolHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
   return async (input: unknown) => {
@@ -78,7 +83,22 @@ export function createServer(context: ToolExecutionContext) {
     version: '0.1.0'
   });
 
-  for (const tool of createToolRegistry(context)) {
+  const agentTools = createToolRegistry(context).filter((tool) =>
+    tool.actorScopes.some((scope) => scope === 'agent')
+  );
+
+  // createServer() runs per HTTP MCP session; log the agent tool surface once
+  // per process so multi-client usage doesn't flood the logs with identical lines.
+  if (!loggedAgentToolStartup) {
+    const agentToolNames = agentTools.map((tool) => tool.name);
+    console.info('[gated-review] server.start', {
+      operation: 'server.start',
+      detail: `agent tools: ${agentToolNames.join(', ')}`
+    });
+    loggedAgentToolStartup = true;
+  }
+
+  for (const tool of agentTools) {
     server.registerTool(
       tool.name,
       {
@@ -94,7 +114,7 @@ export function createServer(context: ToolExecutionContext) {
   return server;
 }
 
-export async function runStdioServer() {
+export async function runHttpServer() {
   const configResult = await loadGitHubAppConfig();
   if (!configResult.ok) {
     throw new Error(configResult.error.detail);
@@ -105,16 +125,69 @@ export async function runStdioServer() {
     throw new Error(githubClientResult.error.message);
   }
 
-  const repositoryResult = await resolveRepositoryScope();
-  if (!repositoryResult.ok) {
-    throw new Error(repositoryResult.error.detail);
-  }
-
   const context = createToolExecutionContext(
     githubClientResult.value,
-    repositoryResult.value,
-    configResult.value.copilotReviewerLogin
+    configResult.value.copilotReviewerLogin,
+    createInMemoryFreshnessStore()
   );
-  const server = createServer(context);
-  await server.connect(new StdioServerTransport());
+
+  const sessions = new Map<string, StreamableHTTPServerTransport>();
+
+  const httpServer = createHttpServer(async (req, res) => {
+    try {
+      if (req.url !== '/mcp') {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+
+      const sessionId = req.headers['mcp-session-id'];
+
+      if (typeof sessionId === 'string') {
+        if (!sessions.has(sessionId)) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Session not found' }));
+          return;
+        }
+        await sessions.get(sessionId)!.handleRequest(req, res);
+        return;
+      }
+
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (id) => {
+          sessions.set(id, transport);
+        },
+        onsessionclosed: (id) => {
+          sessions.delete(id);
+        }
+      });
+
+      const server = createServer(context);
+      await server.connect(transport);
+      await transport.handleRequest(req, res);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[gated-review] request error', { detail: message });
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
+    }
+  });
+
+  const { httpPort } = configResult.value;
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once('error', reject);
+    httpServer.listen(httpPort, () => {
+      console.info('[gated-review] server.listen', {
+        operation: 'server.listen',
+        detail: `HTTP MCP server listening on port ${httpPort}`
+      });
+      resolve();
+    });
+  });
+
+  return httpServer;
 }

@@ -108,7 +108,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'open_pr',
       title: 'Open Pull Request',
-      description: 'Open a pull request in the configured repository scope.',
+      description: 'Open a pull request. Requires repository as an owner/name slug.',
       actorScopes: ['agent'] as const,
       inputSchemaName: 'open_pr.input',
       outputSchemaName: 'open_pr.output',
@@ -119,7 +119,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'reply_to_thread',
       title: 'Reply To Thread',
-      description: 'Reply to a GitHub review thread.',
+      description: 'Reply to a GitHub review thread. Requires repository as an owner/name slug.',
       actorScopes: ['agent'] as const,
       inputSchemaName: 'reply_to_thread.input',
       outputSchemaName: 'reply_to_thread.output',
@@ -130,7 +130,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'resolve_thread',
       title: 'Resolve Thread',
-      description: 'Resolve a GitHub review thread.',
+      description: 'Resolve a review thread once you have actually handled it (fix pushed, or operator-approved ignore). Unresolved threads are the agent inbox; resolving is how a handled thread leaves it. Requires repository as an owner/name slug.',
       actorScopes: ['agent'] as const,
       inputSchemaName: 'resolve_thread.input',
       outputSchemaName: 'resolve_thread.output',
@@ -141,7 +141,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'request_next_round',
       title: 'Request Next Round',
-      description: 'Request another CodeRabbit review round on a pull request.',
+      description: 'Request another CodeRabbit review round on a pull request. Requires repository as an owner/name slug.',
       actorScopes: ['agent'] as const,
       inputSchemaName: 'request_next_round.input',
       outputSchemaName: 'request_next_round.output',
@@ -185,7 +185,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'git.push',
       title: 'Git Push',
-      description: 'Push the current or requested branch to the origin remote via the MCP server.',
+      description: 'Push a branch to origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'operator'] as const,
       inputSchemaName: 'git.push.input',
       outputSchemaName: 'git.push.output',
@@ -196,7 +196,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'git.pull',
       title: 'Git Pull',
-      description: 'Pull the requested branch from the origin remote via the MCP server.',
+      description: 'Pull a branch from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'operator'] as const,
       inputSchemaName: 'git.pull.input',
       outputSchemaName: 'git.pull.output',
@@ -207,7 +207,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'git.fetch',
       title: 'Git Fetch',
-      description: 'Fetch the requested refspec from the origin remote via the MCP server.',
+      description: 'Fetch a refspec from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'operator'] as const,
       inputSchemaName: 'git.fetch.input',
       outputSchemaName: 'git.fetch.output',
@@ -218,7 +218,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'get_review_round',
       title: 'Review Round',
-      description: 'Read the current review round for a pull request.',
+      description: 'Read the current review round for a pull request. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'event_source'] as const,
       inputSchemaName: 'get_review_round.input',
       outputSchemaName: 'get_review_round.output',
@@ -229,7 +229,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'pr_status',
       title: 'PR Status',
-      description: 'Read advisory status for a pull request.',
+      description: 'Read advisory status for a pull request. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'operator', 'event_source'] as const,
       inputSchemaName: 'pr_status.input',
       outputSchemaName: 'pr_status.output',

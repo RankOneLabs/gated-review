@@ -50,6 +50,7 @@ describe('merge_pr', () => {
     const handler = createMergePrHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       mergeMethod: 'squash',
       commitTitle: 'Merge pull request #17',
@@ -116,6 +117,7 @@ describe('merge_pr', () => {
     const handler = createMergePrHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       mergeMethod: 'merge'
     });
@@ -163,6 +165,7 @@ describe('merge_pr', () => {
     const handler = createMergePrHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17,
       mergeMethod: 'merge'
     });

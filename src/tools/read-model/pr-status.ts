@@ -4,12 +4,15 @@ import type { GitHubError } from '#root/src/github/errors.js';
 import type { ToolExecutionContext } from '#root/src/tools/context.js';
 import { summarizeChecks } from '#root/src/tools/read-model/checks.js';
 import { prStatusInputSchema } from '#root/src/tools/schemas.js';
+import { makeRepoPrKey } from '#root/src/tools/freshness-store.js';
 import {
   prStatusQuery,
+  type GraphQLPrState,
   type GraphQLPrStatusQueryData
 } from '#root/src/tools/read-model/graphql-queries.js';
 import type { PullRequestStatus } from '#root/src/tools/read-model/types.js';
 import { loadMergeReadyState } from '#root/src/tools/operator/merge-ready.js';
+import { parseRepoSlug, type RepositoryRef } from '#root/src/tools/repository-ref.js';
 
 const operationName = 'pr_status';
 const graphqlRequestLabel = 'POST /graphql';
@@ -32,6 +35,7 @@ function remapToolError(error: ToolDomainError): ToolDomainError {
 
 async function requestPrStatusPage(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number,
   after: string | null
 ): Promise<Result<GraphQLPrStatusQueryData, ToolDomainError>> {
@@ -40,8 +44,8 @@ async function requestPrStatusPage(
     requestLabel: graphqlRequestLabel,
     query: prStatusQuery,
     variables: {
-      owner: context.repository.owner,
-      repo: context.repository.repo,
+      owner: repository.owner,
+      repo: repository.repo,
       number: pullRequestNumber,
       after
     }
@@ -56,14 +60,16 @@ async function requestPrStatusPage(
 
 async function loadOpenThreadCount(
   context: ToolExecutionContext,
+  repository: RepositoryRef,
   pullRequestNumber: number
-): Promise<Result<{ openThreadCount: number; headRefOid: string }, ToolDomainError>> {
+): Promise<Result<{ openThreadCount: number; headRefOid: string; prState: GraphQLPrState }, ToolDomainError>> {
   let after: string | null = null;
   let headRefOid: string | null = null;
+  let prState: GraphQLPrState | null = null;
   let openThreadCount = 0;
 
   while (true) {
-    const page = await requestPrStatusPage(context, pullRequestNumber, after);
+    const page = await requestPrStatusPage(context, repository, pullRequestNumber, after);
     if (!page.ok) {
       return page;
     }
@@ -76,6 +82,7 @@ async function loadOpenThreadCount(
     }
 
     headRefOid = headRefOid ?? pullRequest.headRefOid;
+    prState = prState ?? pullRequest.state;
 
     for (const thread of pullRequest.reviewThreads.nodes) {
       if (!thread.isResolved) {
@@ -102,7 +109,8 @@ async function loadOpenThreadCount(
 
   return ok({
     openThreadCount,
-    headRefOid
+    headRefOid,
+    prState: prState ?? 'OPEN'
   });
 }
 
@@ -116,23 +124,38 @@ export async function getPrStatus(
   }
 
   const parsedInput = parsed.data;
+  const repoRef = parseRepoSlug(parsedInput.repository);
+  if (!repoRef.ok) {
+    return err(validationRejectedError(operationName, repoRef.error.detail));
+  }
 
-  const openThreads = await loadOpenThreadCount(context, parsedInput.pullRequestNumber);
+  const openThreads = await loadOpenThreadCount(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!openThreads.ok) {
     return openThreads;
   }
 
-  const mergeReady = await loadMergeReadyState(context, parsedInput.pullRequestNumber);
+  const freshness = context.freshness;
+  const isTerminalState =
+    openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED';
+
+  const mergeReady = await loadMergeReadyState(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!mergeReady.ok) {
     return err(remapToolError(mergeReady.error));
   }
 
   const status = await context.github.rest.getCommitCombinedStatus(
-    context.repository,
+    repoRef.value,
     openThreads.value.headRefOid
   );
   if (!status.ok) {
     return err(mapGitHubError(status.error));
+  }
+
+  // Purge only after the downstream reads succeed, so a transient read failure
+  // can't delete the watermark and re-open stale delivery on the next round.
+  if (freshness !== undefined && isTerminalState) {
+    const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
+    freshness.purge(key);
   }
 
   return ok({

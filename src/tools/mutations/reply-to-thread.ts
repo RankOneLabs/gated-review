@@ -8,9 +8,12 @@ import {
   addPullRequestReviewThreadReply,
   type AddPullRequestReviewThreadReplyInput
 } from '#root/src/tools/mutations/graphql-mutations.js';
+import { enforceThreadRepository } from '#root/src/tools/mutations/thread-scope.js';
+import { parseRepoSlug, repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const replyToThreadInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     threadId: z.string().min(1),
     body: z.string().min(1)
   })
@@ -37,6 +40,21 @@ export function createReplyToThreadHandler(context: ToolExecutionContext) {
     }
 
     const parsedInput = parsed.data;
+    const repoRef = parseRepoSlug(parsedInput.repository);
+    if (!repoRef.ok) {
+      return err(validationRejectedError('reply_to_thread', repoRef.error.detail));
+    }
+
+    const scope = await enforceThreadRepository(
+      context.github.graphql,
+      'reply_to_thread',
+      parsedInput.threadId,
+      repoRef.value
+    );
+    if (!scope.ok) {
+      return err(scope.error);
+    }
+
     const result = await addPullRequestReviewThreadReply(context.github.graphql, {
       threadId: parsedInput.threadId,
       body: parsedInput.body

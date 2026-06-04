@@ -10,9 +10,11 @@ import {
   type GitRunnerDependenciesProvider
 } from '#root/src/tools/git/runner.js';
 import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js';
+import { repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const gitPullInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     repo_path: z.string().min(1),
     branch: z.string().min(1).optional(),
     rebase: z.boolean().optional()
@@ -49,7 +51,7 @@ export function createGitPullTool(
   return {
     name: 'git.pull',
     title: 'Git Pull',
-    description: 'Pull the requested branch from the origin remote via the MCP server.',
+    description: 'Pull a branch from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
     actorScopes: ['agent', 'operator'],
     inputSchemaName: 'git.pull.input',
     outputSchemaName: 'git.pull.output',

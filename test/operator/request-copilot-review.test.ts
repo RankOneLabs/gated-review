@@ -29,6 +29,7 @@ describe('request_copilot_review', () => {
     const handler = createRequestCopilotReviewHandler(context);
 
     const result = await handler({
+      repository: 'openai/gated-review',
       pullRequestNumber: 17
     });
 

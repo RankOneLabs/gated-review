@@ -9,6 +9,7 @@ export type GitHubAppConfig = {
   apiBaseUrl: string;
   graphqlUrl: string;
   copilotReviewerLogin: string;
+  httpPort: number;
 };
 
 export type GitHubConfigError =
@@ -34,7 +35,7 @@ const defaultApiBaseUrl = 'https://api.github.com';
 const defaultGraphqlUrl = 'https://api.github.com/graphql';
 const defaultCopilotReviewerLogin = 'copilot[bot]';
 
-function parsePositiveInteger(value: string | undefined, variableName: string) {
+function parsePositiveInteger(value: string | undefined, variableName: string, max?: number) {
   if (value === undefined || value.trim() === '') {
     return err<number, GitHubConfigError>({
       kind: 'missing_configuration',
@@ -49,6 +50,14 @@ function parsePositiveInteger(value: string | undefined, variableName: string) {
       kind: 'invalid_configuration',
       operation: 'load_github_app_config',
       detail: `${variableName} must be a positive integer.`
+    });
+  }
+
+  if (max !== undefined && parsed > max) {
+    return err<number, GitHubConfigError>({
+      kind: 'invalid_configuration',
+      operation: 'load_github_app_config',
+      detail: `${variableName} must be between 1 and ${max}.`
     });
   }
 
@@ -156,12 +165,18 @@ export async function loadGitHubAppConfig(
     return err<GitHubAppConfig, GitHubConfigError>(copilotReviewerLogin.error);
   }
 
+  const httpPort = parsePositiveInteger(env.GATED_REVIEW_HTTP_PORT, 'GATED_REVIEW_HTTP_PORT', 65535);
+  if (!httpPort.ok) {
+    return err<GitHubAppConfig, GitHubConfigError>(httpPort.error);
+  }
+
   return ok({
     appId: appId.value,
     installationId: installationId.value,
     privateKey: privateKey.value,
     apiBaseUrl: apiBaseUrl.value,
     graphqlUrl: graphqlUrl.value,
-    copilotReviewerLogin: copilotReviewerLogin.value
+    copilotReviewerLogin: copilotReviewerLogin.value,
+    httpPort: httpPort.value
   });
 }

@@ -73,11 +73,11 @@ describe('open_pr', () => {
         graphql,
         rest
       },
-      repository: { owner: 'openai', repo: 'gated-review' },
       copilotReviewerLogin: 'github-copilot[bot]'
     });
 
     const result = await handler({
+      repository: 'openai/gated-review',
       base: 'main',
       head: 'feature-branch',
       title: 'Add feature',

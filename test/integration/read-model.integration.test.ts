@@ -51,6 +51,7 @@ function createMockContext() {
             data: {
               repository: {
                 pullRequest: {
+                  state: 'OPEN',
                   reviewThreads: {
                     nodes: [
                       {
@@ -142,6 +143,7 @@ function createMockContext() {
             data: {
               repository: {
                 pullRequest: {
+                  state: 'OPEN',
                   headRefOid: 'head-sha-123',
                   reviewThreads: {
                     nodes: [
@@ -226,10 +228,6 @@ function createMockContext() {
         graphql,
         rest
       },
-      repository: {
-        owner: 'openai',
-        repo: 'gated-review'
-      },
       copilotReviewerLogin: 'github-copilot[bot]'
     } satisfies ToolExecutionContext
   };
@@ -241,6 +239,7 @@ describe('read-model integration', () => {
 
     const result = await getReviewRound(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       context
@@ -252,12 +251,14 @@ describe('read-model integration', () => {
         pullRequestNumber: 42,
         includeResolved: false,
         openThreadCount: 1,
+        freshSince: null,
         threads: [
           {
             id: 'thread-open',
             state: 'open',
             path: 'src/open.ts',
             line: 12,
+            hasFreshComments: true,
             comments: [
               {
                 id: 'comment-1',
@@ -299,6 +300,7 @@ describe('read-model integration', () => {
 
     const result = await getPrStatus(
       {
+        repository: 'openai/gated-review',
         pullRequestNumber: 42
       },
       context

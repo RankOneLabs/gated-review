@@ -10,9 +10,11 @@ import {
   type GitRunnerDependenciesProvider
 } from '#root/src/tools/git/runner.js';
 import { getDefaultGitRunnerDependencies } from '#root/src/tools/git/runtime.js';
+import { repositorySlugSchema } from '#root/src/tools/repository-ref.js';
 
 export const gitFetchInputSchema = z
   .object({
+    repository: repositorySlugSchema,
     repo_path: z.string().min(1),
     refspec: z.string().min(1).optional()
   })
@@ -47,7 +49,7 @@ export function createGitFetchTool(
   return {
     name: 'git.fetch',
     title: 'Git Fetch',
-    description: 'Fetch the requested refspec from the origin remote via the MCP server.',
+    description: 'Fetch a refspec from origin through the server (remote credentials stay server-side). Do NOT use git push/pull/fetch in the shell or GitHub CLI (gh) for remote operations. Requires repository as an owner/name slug.',
     actorScopes: ['agent', 'operator'],
     inputSchemaName: 'git.fetch.input',
     outputSchemaName: 'git.fetch.output',
