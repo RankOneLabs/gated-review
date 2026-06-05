@@ -6,7 +6,7 @@ Bounded MCP server for agent-driven GitHub PR reviews, with enforced triage and 
 
 ## Standards
 
-<!-- import: /home/steve/codes/rol/catagents/standards/core.md @ d1e1747157da -->
+<!-- import: /home/steve/codes/rol/catagents/standards/core.md @ 1362c01763c6 -->
 ## Two gates before building
 
 **Stop when uncertain.** Before introducing a pattern, dependency, file, or structural
@@ -91,7 +91,7 @@ over terse — `user_count`, not `n`. Booleans read as questions — `is_active`
 `has_permission`, `should_retry`.
 <!-- /import: /home/steve/codes/rol/catagents/standards/core.md -->
 
-<!-- import: /home/steve/codes/rol/catagents/standards/typescript.md @ d1e1747157da -->
+<!-- import: /home/steve/codes/rol/catagents/standards/typescript.md @ 1362c01763c6 -->
 ## Strictness
 
 `strict` mode on. No `any` — use `unknown` and narrow. No non-null assertions (`!`)
@@ -133,7 +133,7 @@ The project's configured linter and formatter (ESLint + Prettier, or Biome) clea
 Type-check in CI, not just locally.
 <!-- /import: /home/steve/codes/rol/catagents/standards/typescript.md -->
 
-<!-- import: /home/steve/codes/rol/catagents/standards/backend.md @ d1e1747157da -->
+<!-- import: /home/steve/codes/rol/catagents/standards/backend.md @ 1362c01763c6 -->
 ## Contracts first
 
 Define the API or data contract as named types before writing the handler. Derive the
@@ -175,3 +175,27 @@ config. Secrets come from the environment; never commit them, never log them.
 Pure logic is unit-tested in isolation. IO and integration seams are tested at the
 boundary, against real or faithfully-faked dependencies.
 <!-- /import: /home/steve/codes/rol/catagents/standards/backend.md -->
+
+## Environment
+
+<!-- import: /home/steve/codes/rol/catagents/standards/gated-review.md @ 1362c01763c6 -->
+## Gated Review environment
+
+This environment has the gated-review MCP server connected. All PR and
+remote-git operations go through it — never the shell or the GitHub API.
+
+**Never use:**
+- `gh` (GitHub CLI) for any PR or API operation
+- `git push`, `git pull`, or `git fetch` in the shell
+- the GitHub REST or GraphQL API directly
+
+**Always use instead:**
+- `get_review_round` — read PR review threads and comments
+- `reply_to_thread` — reply to a review thread
+- `resolve_thread` — resolve a handled thread
+- `git.push` / `git.pull` / `git.fetch` — all remote git operations
+
+**Merging and merge-ready are human-only.** Do not call `merge_pr` or
+`mark_merge_ready`, and do not decide merge readiness. Report the evidence
+(open thread count, push status) and hand the decision to the operator.
+<!-- /import: /home/steve/codes/rol/catagents/standards/gated-review.md -->
