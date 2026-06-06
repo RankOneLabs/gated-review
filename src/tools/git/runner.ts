@@ -277,7 +277,11 @@ function parseGitRemoteTarget(remoteUrl: string): Result<RemoteTarget, string> {
     if (scpMatch === null) {
       return err('origin remote must be a GitHub https or ssh URL.');
     }
-    return splitOwnerRepo(scpMatch[2], scpMatch[1]);
+    // Lowercase the host to match WHATWG URL parsing (which lowercases
+    // `.hostname` for the https/ssh:// branches): the allowlist check is
+    // case-sensitive, so a scp-style `git@GitHub.com:owner/repo` must
+    // normalize to `github.com` or it would be wrongly rejected.
+    return splitOwnerRepo(scpMatch[2], scpMatch[1].toLowerCase());
   }
 
   let parsedUrl: URL;
