@@ -1,3 +1,13 @@
 comms/
 node_modules/
 .catagents/
+
+# local secrets / private key material
+keys/
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
