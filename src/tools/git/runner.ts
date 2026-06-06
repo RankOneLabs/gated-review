@@ -301,6 +301,12 @@ function parseGitRemoteTarget(remoteUrl: string): Result<RemoteTarget, string> {
     return err('origin remote must not embed credentials.');
   }
 
+  // `.hostname` (not `.host`) intentionally drops any port: this server targets
+  // github.com, which has no custom port or IPv6 host, and an `ssh://host:22`
+  // remote must not carry its ssh port onto the constructed https URL. A
+  // GitHub-Enterprise instance on a non-default https port or an IPv6 host is
+  // out of scope; it would fail closed (allowlist reject), never misroute the
+  // token. Revisit here if GHE/IPv6 support is ever needed.
   return splitOwnerRepo(parsedUrl.pathname, parsedUrl.hostname);
 }
 
