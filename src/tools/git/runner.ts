@@ -249,6 +249,61 @@ async function resolveCurrentBranch(
 
 type RemoteTarget = Readonly<{ host: string; owner: string; repo: string }>;
 
+/**
+ * Parse a GitHub remote URL into host/owner/repo. Accepts the three forms a
+ * checkout may carry: `https://host/owner/repo(.git)`, `ssh://git@host/owner/repo(.git)`,
+ * and the scp-style `git@host:owner/repo(.git)`. The server always pushes over
+ * https with an installation token (see runRemoteGitCommand), so an ssh `origin`
+ * is first-class — only owner/repo/host are taken from it, never its transport.
+ */
+function parseGitRemoteTarget(remoteUrl: string): Result<RemoteTarget, string> {
+  const stripDotGit = (value: string) => value.replace(/\.git$/, '');
+  // Drop leading/trailing slashes so a trailing `/` does not register as an extra
+  // empty segment; a valid GitHub repo path is exactly owner/repo(.git).
+  const splitOwnerRepo = (path: string, host: string): Result<RemoteTarget, string> => {
+    const segments = path.replace(/^\/+/, '').replace(/\/+$/, '').split('/');
+    const owner = segments[0] ?? '';
+    const repo = stripDotGit(segments[1] ?? '');
+    if (owner === '' || repo === '' || segments.length !== 2) {
+      return err(`origin remote ${host} path must be owner/repo.`);
+    }
+    return ok({ host, owner, repo });
+  };
+
+  // scp-style `git@host:owner/repo` is not a parseable URL; it is distinguished
+  // from ssh:// by the absence of a scheme separator.
+  if (!remoteUrl.includes('://')) {
+    const scpMatch = /^(?:[^@/]+@)?([^/:]+):(.+)$/.exec(remoteUrl);
+    if (scpMatch === null) {
+      return err('origin remote must be a GitHub https or ssh URL.');
+    }
+    return splitOwnerRepo(scpMatch[2], scpMatch[1]);
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(remoteUrl);
+  } catch {
+    return err('origin remote is not a valid URL.');
+  }
+
+  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'ssh:') {
+    return err('origin remote must use https or ssh.');
+  }
+
+  // An https origin must not carry a baked-in token; ssh user info (git@) is
+  // expected and harmless since we never push over ssh.
+  const embedsCredential =
+    parsedUrl.protocol === 'https:'
+      ? parsedUrl.username !== '' || parsedUrl.password !== ''
+      : parsedUrl.password !== '';
+  if (embedsCredential) {
+    return err('origin remote must not embed credentials.');
+  }
+
+  return splitOwnerRepo(parsedUrl.pathname, parsedUrl.hostname);
+}
+
 async function resolveRemoteHost(
   repoPath: string,
   allowedHosts: readonly string[],
@@ -271,35 +326,16 @@ async function resolveRemoteHost(
     return err(toValidationError('git.remote', 'origin remote URL is empty.'));
   }
 
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(remoteUrl);
-  } catch {
-    return err(toValidationError('git.remote', 'origin remote must be an https GitHub URL.'));
+  const target = parseGitRemoteTarget(remoteUrl);
+  if (!target.ok) {
+    return err(toValidationError('git.remote', target.error));
   }
 
-  if (parsedUrl.protocol !== 'https:') {
-    return err(toValidationError('git.remote', 'origin remote must use https.'));
+  if (!allowedHosts.includes(target.value.host)) {
+    return err(toValidationError('git.remote', `origin host ${target.value.host} is not an allowed GitHub host.`));
   }
 
-  if (parsedUrl.username !== '' || parsedUrl.password !== '') {
-    return err(toValidationError('git.remote', 'origin remote must not embed credentials.'));
-  }
-
-  if (!allowedHosts.includes(parsedUrl.host)) {
-    return err(toValidationError('git.remote', `origin host ${parsedUrl.host} is not an allowed GitHub host.`));
-  }
-
-  // Drop leading and trailing slashes so a trailing `/` does not register as an
-  // extra empty segment; a valid GitHub repo path is exactly owner/repo(.git).
-  const segments = parsedUrl.pathname.replace(/^\/+/, '').replace(/\/+$/, '').split('/');
-  const owner = segments[0] ?? '';
-  const repo = (segments[1] ?? '').replace(/\.git$/, '');
-  if (owner === '' || repo === '' || segments.length !== 2) {
-    return err(toValidationError('git.remote', `origin remote ${parsedUrl.host} path must be /owner/repo.`));
-  }
-
-  return ok({ host: parsedUrl.host, owner, repo });
+  return ok(target.value);
 }
 
 async function resolveGitInstallationId(
@@ -374,7 +410,16 @@ async function runRemoteGitCommand(
   }
 
   const extraHeader = createGitHubExtraHeader(remote.value.host, token.value);
-  const args = buildGitArgs(repoPath, extraHeader, command);
+  // Target an explicit https URL rather than the literal `origin` remote, so an
+  // ssh `origin` (which the installation token cannot authenticate) still works.
+  // owner/repo/host come from origin; only the transport is forced to https.
+  const remoteHttpsUrl = `https://${remote.value.host}/${remote.value.owner}/${remote.value.repo}.git`;
+  const originIndex = command.indexOf('origin');
+  const resolvedCommand =
+    originIndex === -1
+      ? command
+      : [...command.slice(0, originIndex), remoteHttpsUrl, ...command.slice(originIndex + 1)];
+  const args = buildGitArgs(repoPath, extraHeader, resolvedCommand);
   const result = await executeGitCommand(
     dependencies.spawn ?? defaultSpawn,
     commandKind,

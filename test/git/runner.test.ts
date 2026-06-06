@@ -111,12 +111,52 @@ describe('git runner', () => {
           'utf8'
         ).toString('base64')}`,
         'push',
-        'origin',
+        'https://github.com/example/repo.git',
         'feature/main'
       ]
     ]);
     expect(calls[0]?.options.env?.GIT_TERMINAL_PROMPT).toBe('0');
     expect(calls[0]?.options.env?.GCM_INTERACTIVE).toBe('never');
+    expect(tokenProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it('pushes over https with the token even when origin is an ssh remote', async () => {
+    const repoPath = mkdtempSync(join(tmpdir(), 'gated-review-'));
+    const { spawn, calls } = createSpawnMock([
+      { stdout: 'true\n' },
+      { stdout: 'feature/main\n' },
+      { stdout: 'git@github.com:example/repo.git\n' },
+      { stdout: '', stderr: '', exitCode: 0 }
+    ]);
+    const tokenProvider = vi.fn(createTokenProvider('token-123').getInstallationToken);
+
+    const result = await pushGitRepository(
+      { repo_path: repoPath },
+      {
+        installationId: 42,
+        tokenProvider: {
+          getInstallationToken: tokenProvider
+        },
+        githubHosts: ['github.com'],
+        spawn
+      }
+    );
+
+    expect(result).toEqual({ ok: true, value: { ok: true } });
+    // origin is ssh, but the push targets the constructed https URL and carries
+    // the installation token via the matching http.extraheader.
+    expect(calls.at(-1)?.args).toEqual([
+      '-C',
+      repoPath,
+      '-c',
+      `http.https://github.com/.extraheader=AUTHORIZATION: basic ${Buffer.from(
+        'x-access-token:token-123',
+        'utf8'
+      ).toString('base64')}`,
+      'push',
+      'https://github.com/example/repo.git',
+      'feature/main'
+    ]);
     expect(tokenProvider).toHaveBeenCalledTimes(1);
   });
 
@@ -155,7 +195,7 @@ describe('git runner', () => {
         ).toString('base64')}`,
         'pull',
         '--rebase',
-        'origin',
+        'https://github.com/example/repo.git',
         'feature/main'
       ],
       ['-C', repoPath, 'rev-parse', 'HEAD']
