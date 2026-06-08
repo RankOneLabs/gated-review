@@ -107,7 +107,7 @@ stop and ask for another operator decision.
 ## Requesting Another Round
 
 After a fix push, the agent may call `request_next_round` when the policy for
-the repository wants an explicit CodeRabbit re-review command.
+the repository wants an explicit Copilot re-review request.
 
 `request_next_round` is optional and policy-driven. The agent should not call it
 when the operator or repository policy expects reviewers to run automatically.

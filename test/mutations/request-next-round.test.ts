@@ -13,7 +13,7 @@ describe('request_next_round', () => {
     }
   };
 
-  it('posts the fixed CodeRabbit review nudge comment on the pull request', async () => {
+  it('requests the configured Copilot reviewer on the pull request', async () => {
     const requests: Array<{ url: string; body: unknown }> = [];
     const rest = createGitHubRestClient(
       {
@@ -29,9 +29,9 @@ describe('request_next_round', () => {
           });
           return new Response(
             JSON.stringify({
-              id: 123,
-              body: '@coderabbitai review',
-              html_url: 'https://github.com/openai/gated-review/pull/17#issuecomment-123'
+              number: 17,
+              requested_reviewers: [{ login: 'github-copilot[bot]' }],
+              requested_teams: []
             }),
             {
               status: 201,
@@ -65,6 +65,7 @@ describe('request_next_round', () => {
       }
     );
 
+    const copilotReviewerLogin = 'github-copilot[bot]';
     const handler = createRequestNextRoundHandler({
       github: {
         installationId: 99,
@@ -73,7 +74,7 @@ describe('request_next_round', () => {
         graphql,
         rest
       },
-      copilotReviewerLogin: 'github-copilot[bot]'
+      copilotReviewerLogin
     });
 
     const result = await handler({
@@ -89,9 +90,9 @@ describe('request_next_round', () => {
     }
     expect(requests).toEqual([
       {
-        url: 'https://api.github.com/repos/openai/gated-review/issues/17/comments',
+        url: 'https://api.github.com/repos/openai/gated-review/pulls/17/requested_reviewers',
         body: {
-          body: '@coderabbitai review'
+          reviewers: [copilotReviewerLogin]
         }
       }
     ]);
