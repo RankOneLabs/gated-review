@@ -39,10 +39,10 @@ export function createRequestNextRoundHandler(context: ToolExecutionContext) {
       return err(validationRejectedError('request_next_round', repoRef.error.detail));
     }
 
-    const result = await context.github.rest.createIssueComment(
+    const result = await context.github.rest.requestPullRequestReviewers(
       repoRef.value,
       parsedInput.pullRequestNumber,
-      '@coderabbitai review'
+      [context.copilotReviewerLogin]
     );
 
     if (!result.ok) {

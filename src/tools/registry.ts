@@ -141,7 +141,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'request_next_round',
       title: 'Request Next Round',
-      description: 'Request another CodeRabbit review round on a pull request. Requires repository as an owner/name slug.',
+      description: 'Request another Copilot review round on a pull request. Requires repository as an owner/name slug.',
       actorScopes: ['agent'] as const,
       inputSchemaName: 'request_next_round.input',
       outputSchemaName: 'request_next_round.output',

@@ -359,7 +359,7 @@ describe('mutation integration', () => {
         .map((entry) => (entry.request as { url: string; method: string; body?: unknown }).url)
     ).toEqual([
       'https://api.github.com/repos/openai/gated-review/pulls',
-      'https://api.github.com/repos/openai/gated-review/issues/17/comments',
+      'https://api.github.com/repos/openai/gated-review/pulls/17/requested_reviewers',
       'https://api.github.com/repos/openai/gated-review/pulls/17/requested_reviewers',
       'https://api.github.com/repos/openai/gated-review/labels/merge-ready',
       'https://api.github.com/repos/openai/gated-review/labels',
