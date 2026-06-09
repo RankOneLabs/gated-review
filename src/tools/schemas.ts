@@ -228,6 +228,21 @@ export const reviewTriagePromptSchema = z
     presentation: z.string().min(1),
     approvalRequired: z.string().min(1)
   })
+  .refine(
+    (prompt) => {
+      const bucketNames = new Set(prompt.buckets.map((bucket) => bucket.name));
+      return (
+        bucketNames.size === 3 &&
+        bucketNames.has('fix') &&
+        bucketNames.has('discuss') &&
+        bucketNames.has('ignore')
+      );
+    },
+    {
+      message: 'triage buckets must contain exactly fix, discuss, and ignore',
+      path: ['buckets']
+    }
+  )
   .strict();
 
 export const readModelChecksContextSchema = z
