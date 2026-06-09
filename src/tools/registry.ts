@@ -218,7 +218,8 @@ export function createToolRegistry(context: ToolExecutionContext) {
     {
       name: 'get_review_round',
       title: 'Review Round',
-      description: 'Read the current review round for a pull request. Requires repository as an owner/name slug.',
+      description:
+        'Read the current review round for a pull request and return the required triage prompt for grouping comments into fix, discuss, or ignore. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'event_source'] as const,
       inputSchemaName: 'get_review_round.input',
       outputSchemaName: 'get_review_round.output',

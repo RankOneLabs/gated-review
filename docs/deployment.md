@@ -135,6 +135,60 @@ Place this `.mcp.json` in the project root (or in `~/.claude/`) and Claude Code 
 connect automatically. Any number of clients can connect simultaneously; each gets an
 independent session.
 
+### Codex (`config.toml`)
+
+Codex reads MCP server registrations from `~/.codex/config.toml`, or from a
+trusted project-scoped `.codex/config.toml`. Register the HTTP endpoint directly
+so Codex calls the server as an MCP tool instead of trying to run a shell command
+that would need escalation:
+
+```toml
+[mcp_servers.gated-review]
+url = "http://willie:3555/mcp"
+enabled = true
+required = true
+default_tools_approval_mode = "approve"
+tool_timeout_sec = 120
+```
+
+`default_tools_approval_mode = "approve"` lets Codex call non-destructive
+gated-review tools without stopping for an MCP approval prompt. Destructive or
+side-effecting tool calls can still require approval if the client enforces that
+from tool annotations or policy.
+
+Codex access to `http://willie:3555/mcp` is governed by sandbox/network policy,
+not by the gated-review server. The server cannot grant that access from inside
+an MCP tool response. If Codex can discover the MCP registration but cannot call
+the server, enable network access in the active Codex permission profile.
+
+For the built-in workspace-write sandbox, the minimal shape is:
+
+```toml
+[sandbox_workspace_write]
+network_access = true
+```
+
+For stricter setups, use a named permission profile that extends `:workspace`
+and allows only the gated-review destination:
+
+```toml
+default_permissions = "gated-review-workspace"
+
+[permissions.gated-review-workspace]
+extends = ":workspace"
+
+[permissions.gated-review-workspace.network]
+enabled = true
+
+[permissions.gated-review-workspace.network.domains]
+"willie" = "allow"
+```
+
+If a network proxy policy is also enabled and `willie` resolves to a local,
+private, or tailnet address, allow that local/private destination in the active
+network policy as well. Otherwise Codex can have general network enabled while
+still blocking the MCP server host.
+
 ### Programmatic (TypeScript / MCP SDK)
 
 ```ts

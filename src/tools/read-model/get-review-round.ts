@@ -20,11 +20,34 @@ import {
 import type {
   ReadModelSummaryComment,
   ReadModelThreadComment,
+  ReviewTriagePrompt,
   ReviewRound
 } from '#root/src/tools/read-model/types.js';
 
 const operationName = 'get_review_round';
 const graphqlRequestLabel = 'POST /graphql';
+const triagePrompt: ReviewTriagePrompt = {
+  instruction:
+    'Triage every open review thread into exactly one bucket before acting. Treat summaries as context, not bucketed threads.',
+  buckets: [
+    {
+      name: 'fix',
+      description: 'Clear, correct feedback with an implementation path you can apply locally.'
+    },
+    {
+      name: 'discuss',
+      description: 'Ambiguous, architectural, disputed, or otherwise requiring operator input.'
+    },
+    {
+      name: 'ignore',
+      description: 'Nitpick, style preference, duplicate, or already addressed; resolve only after operator approval.'
+    }
+  ],
+  presentation:
+    'Present open threads grouped as Fix, Discuss, and Ignore. Include location, author, fresh marker, short comment summary, and proposed fix or reason.',
+  approvalRequired:
+    'Stop after presenting triage. Apply fixes, replies, ignores, and resolutions only after operator approval.'
+};
 
 function mapGitHubError(error: GitHubError): ToolDomainError {
   const statusSuffix = error.status === undefined ? '' : ` status=${error.status}`;
@@ -382,6 +405,7 @@ export async function getReviewRound(
     includeResolved: parsedInput.includeResolved ?? false,
     openThreadCount,
     freshSince: prior,
+    triagePrompt,
     threads: threads.map((thread, index) => {
       const threadComments = comments.value[index];
       const hasFreshComments =

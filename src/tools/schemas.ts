@@ -214,6 +214,22 @@ export const readModelSummaryCommentSchema = z
   })
   .strict();
 
+export const reviewTriageBucketSchema = z
+  .object({
+    name: z.enum(['fix', 'discuss', 'ignore']),
+    description: z.string().min(1)
+  })
+  .strict();
+
+export const reviewTriagePromptSchema = z
+  .object({
+    instruction: z.string().min(1),
+    buckets: z.array(reviewTriageBucketSchema).length(3),
+    presentation: z.string().min(1),
+    approvalRequired: z.string().min(1)
+  })
+  .strict();
+
 export const readModelChecksContextSchema = z
   .object({
     context: z.string().min(1),
@@ -254,6 +270,7 @@ export const getReviewRoundOutputSchema = z
     includeResolved: z.boolean(),
     openThreadCount: z.number().int().nonnegative(),
     freshSince: z.string().datetime().nullable(),
+    triagePrompt: reviewTriagePromptSchema,
     threads: z.array(readModelReviewThreadSchema),
     summaries: z.array(readModelSummaryCommentSchema)
   })
