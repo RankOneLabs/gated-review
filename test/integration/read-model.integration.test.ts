@@ -14,6 +14,7 @@ import {
   reviewRoundThreadsQuery,
   reviewThreadCommentsQuery
 } from '#root/src/tools/read-model/graphql-queries.js';
+import { expectedTriagePrompt } from '#root/test/fixtures/review-triage-prompt.js';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -252,6 +253,7 @@ describe('read-model integration', () => {
         includeResolved: false,
         openThreadCount: 1,
         freshSince: null,
+        triagePrompt: expectedTriagePrompt,
         threads: [
           {
             id: 'thread-open',

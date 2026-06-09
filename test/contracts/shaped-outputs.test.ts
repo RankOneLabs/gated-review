@@ -21,6 +21,7 @@ import {
   reviewRoundThreadsQuery,
   reviewThreadCommentsQuery
 } from '#root/src/tools/read-model/graphql-queries.js';
+import { expectedTriagePrompt } from '#root/test/fixtures/review-triage-prompt.js';
 
 function createMockContext(): ToolExecutionContext {
   const graphqlRequest = vi.fn(async (request: { operationName: string; query: string; variables?: Record<string, unknown> }) => {
@@ -311,6 +312,7 @@ describe('tool shaped outputs', () => {
         includeResolved: false,
         openThreadCount: 1,
         freshSince: null,
+        triagePrompt: expectedTriagePrompt,
         threads: [
           {
             id: 'thread-open',

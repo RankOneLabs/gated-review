@@ -9,6 +9,7 @@ import {
   reviewThreadCommentsQuery
 } from '#root/src/tools/read-model/graphql-queries.js';
 import { createInMemoryFreshnessStore } from '#root/src/tools/freshness-store.js';
+import { expectedTriagePrompt } from '#root/test/fixtures/review-triage-prompt.js';
 
 function makeThreadsResponse(state: 'OPEN' | 'CLOSED' | 'MERGED' = 'OPEN') {
   return ok({
@@ -212,6 +213,7 @@ describe('getReviewRound', () => {
         includeResolved: false,
         openThreadCount: 1,
         freshSince: null,
+        triagePrompt: expectedTriagePrompt,
         threads: [
           {
             id: 'thread-open',

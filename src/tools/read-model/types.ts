@@ -30,11 +30,26 @@ export type ReadModelSummaryComment = Readonly<{
   author: ReadModelEntity;
 }>;
 
+export type ReviewTriageBucketName = 'fix' | 'discuss' | 'ignore';
+
+export type ReviewTriageBucket = Readonly<{
+  name: ReviewTriageBucketName;
+  description: string;
+}>;
+
+export type ReviewTriagePrompt = Readonly<{
+  instruction: string;
+  buckets: ReviewTriageBucket[];
+  presentation: string;
+  approvalRequired: string;
+}>;
+
 export type ReviewRound = Readonly<{
   pullRequestNumber: number;
   includeResolved: boolean;
   openThreadCount: number;
   freshSince: string | null;
+  triagePrompt: ReviewTriagePrompt;
   threads: ReadModelReviewThread[];
   summaries: ReadModelSummaryComment[];
 }>;

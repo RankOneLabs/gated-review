@@ -19,6 +19,7 @@ import {
   reviewActionSchema,
   reviewDecisionInputSchema,
   reviewEventReceiptOutputSchema,
+  reviewTriagePromptSchema,
   reviewStateInputSchema
 } from '#root/src/tools/schemas.js';
 import {
@@ -32,6 +33,7 @@ import { createGitHubGraphQLClient } from '#root/src/github/graphql.js';
 import { createGitHubRestClient } from '#root/src/github/rest.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
 import type { ToolContract } from '#root/src/tools/types.js';
+import { expectedTriagePrompt } from '#root/test/fixtures/review-triage-prompt.js';
 import type { ZodTypeAny } from 'zod';
 
 const defaultInputFixture = { reviewId: 'review-123' };
@@ -610,6 +612,7 @@ describe('tool contracts', () => {
         includeResolved: false,
         openThreadCount: 1,
         freshSince: null,
+        triagePrompt: expectedTriagePrompt,
         threads: [
           {
             id: 'thread-1',
@@ -647,6 +650,7 @@ describe('tool contracts', () => {
       includeResolved: false,
       openThreadCount: 1,
       freshSince: null,
+      triagePrompt: expectedTriagePrompt,
       threads: [
         {
           id: 'thread-1',
@@ -717,6 +721,19 @@ describe('tool contracts', () => {
         contexts: [{ context: 'lint', state: 'success' }]
       }
     });
+  });
+
+  it('rejects duplicate review triage bucket names', () => {
+    expect(
+      reviewTriagePromptSchema.safeParse({
+        ...expectedTriagePrompt,
+        buckets: [
+          expectedTriagePrompt.buckets[0],
+          expectedTriagePrompt.buckets[0],
+          expectedTriagePrompt.buckets[1]
+        ]
+      }).success
+    ).toBe(false);
   });
 
   it('keeps the operator tool schemas shaped for merge control', () => {
@@ -836,6 +853,7 @@ describe('tool contracts', () => {
             includeResolved: false,
             openThreadCount: 1,
             freshSince: null,
+            triagePrompt: expectedTriagePrompt,
             threads: [
               {
                 id: 'thread-open',
