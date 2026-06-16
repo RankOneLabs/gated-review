@@ -396,6 +396,31 @@ describe('getReviewRound', () => {
     }
   });
 
+  it('treats an invalid delivery watermark as unseen to avoid under-delivery', async () => {
+    const { github } = createGitHubClientMock();
+
+    const result = await getReviewRound(
+      { repository: 'openai/gated-review', pullRequestNumber: 42 },
+      {
+        github,
+        copilotReviewerLogin: 'github-copilot[bot]',
+        freshness: {
+          lastDeliveredAt: () => 'not-a-date',
+          record: () => undefined,
+          purge: () => undefined
+        }
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.freshSince).toBe('not-a-date');
+      expect(result.value.threads).toHaveLength(1);
+      expect(result.value.threads[0].hasFreshComments).toBe(true);
+      expect(result.value.threads[0].comments).toHaveLength(2);
+    }
+  });
+
   it('purges the watermark when a MERGED PR state is observed', async () => {
     const { github } = createGitHubClientMock('MERGED');
     const freshness = createInMemoryFreshnessStore();

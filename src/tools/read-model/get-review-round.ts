@@ -285,19 +285,24 @@ async function loadSummaryComments(
   return ok(summaries);
 }
 
-function isThreadFresh(comments: ReadModelThreadComment[], prior: string | null): boolean {
-  if (prior === null) return true;
-  const priorMs = Date.parse(prior);
+function parseFreshnessTimestamp(timestamp: string | null): number | null {
+  if (timestamp === null) return null;
+
+  const ms = Date.parse(timestamp);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function isThreadFresh(comments: ReadModelThreadComment[], priorMs: number | null): boolean {
+  if (priorMs === null) return true;
   return comments.some((c) => Date.parse(c.createdAt) > priorMs);
 }
 
 function unseenThreadComments(
   comments: ReadModelThreadComment[],
-  prior: string | null
+  priorMs: number | null
 ): ReadModelThreadComment[] {
-  if (prior === null) return comments;
+  if (priorMs === null) return comments;
 
-  const priorMs = Date.parse(prior);
   return comments.filter((comment) => Date.parse(comment.createdAt) > priorMs);
 }
 
@@ -389,6 +394,7 @@ export async function getReviewRound(
 
   const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
   const prior = context.freshness?.lastDeliveredAt(key) ?? null;
+  const priorMs = parseFreshnessTimestamp(prior);
 
   let maxCreatedAt: string | null = null;
   let maxCreatedAtMs = -Infinity;
@@ -418,13 +424,13 @@ export async function getReviewRound(
     triagePrompt,
     threads: threads.flatMap((thread, index) => {
       const threadComments = comments.value[index];
-      const visibleComments = unseenThreadComments(threadComments, prior);
+      const visibleComments = unseenThreadComments(threadComments, priorMs);
       if (visibleComments.length === 0) {
         return [];
       }
 
       const hasFreshComments =
-        thread.state === 'resolved' ? false : isThreadFresh(visibleComments, prior);
+        thread.state === 'resolved' ? false : isThreadFresh(visibleComments, priorMs);
       return [{
         ...thread,
         hasFreshComments,
