@@ -6,6 +6,7 @@ describe('read model entity tagging', () => {
   it('tags CodeRabbit and Copilot bot logins on the server side', () => {
     expect(classifyAuthorLogin('coderabbitai[bot]')).toBe('coderabbit');
     expect(classifyAuthorLogin('github-copilot[bot]')).toBe('copilot');
+    expect(classifyAuthorLogin('copilot-pull-request-reviewer')).toBe('copilot');
     expect(classifyAuthorLogin('alice')).toBe('human');
   });
 

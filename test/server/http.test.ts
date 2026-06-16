@@ -48,7 +48,7 @@ function createStubContext() {
       graphql,
       rest
     },
-    'copilot[bot]'
+    'copilot-pull-request-reviewer'
   );
 }
 

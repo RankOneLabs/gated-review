@@ -5,6 +5,7 @@ const codeRabbitBotLogins = new Set(['coderabbitai[bot]']);
 const copilotBotLogins = new Set([
   'copilot[bot]',
   'github-copilot[bot]',
+  'copilot-pull-request-reviewer',
   'copilot-swe-agent[bot]',
   'copilot-code-reviewer[bot]',
   'copilot-reviewer[bot]'

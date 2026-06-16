@@ -60,7 +60,7 @@ GATED_REVIEW_HTTP_PORT=3555
 # Optional overrides — omit for github.com defaults
 # GITHUB_API_BASE_URL=https://api.github.com
 # GITHUB_GRAPHQL_URL=https://api.github.com/graphql
-# GITHUB_COPILOT_REVIEWER_LOGIN=copilot[bot]
+# GITHUB_COPILOT_REVIEWER_LOGIN=copilot-pull-request-reviewer
 ```
 
 `GITHUB_APP_PRIVATE_KEY_PATH` is set in the compose `environment:` block (not the

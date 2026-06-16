@@ -13,7 +13,7 @@ The server reads all configuration from environment variables at startup and fai
 | `GATED_REVIEW_HTTP_PORT` | Yes | — | Port the HTTP MCP server listens on (e.g. `3555`). Must be a positive integer ≤ 65535. |
 | `GITHUB_API_BASE_URL` | No | `https://api.github.com` | Override for GitHub REST base URL (GitHub Enterprise). |
 | `GITHUB_GRAPHQL_URL` | No | `https://api.github.com/graphql` | Override for GitHub GraphQL endpoint (GitHub Enterprise). |
-| `GITHUB_COPILOT_REVIEWER_LOGIN` | No | `copilot[bot]` | Login used by `request_copilot_review`. |
+| `GITHUB_COPILOT_REVIEWER_LOGIN` | No | `copilot-pull-request-reviewer` | Login used by `request_next_round` and `request_copilot_review`. |
 
 \* At least one is required. If both are set, `GITHUB_APP_PRIVATE_KEY` takes priority and `GITHUB_APP_PRIVATE_KEY_PATH` is ignored.
 

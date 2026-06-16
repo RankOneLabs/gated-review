@@ -39,7 +39,7 @@ export type GitHubConfigEnvironment = Readonly<Record<string, string | undefined
 
 const defaultApiBaseUrl = 'https://api.github.com';
 const defaultGraphqlUrl = 'https://api.github.com/graphql';
-const defaultCopilotReviewerLogin = 'copilot[bot]';
+const defaultCopilotReviewerLogin = 'copilot-pull-request-reviewer';
 
 function parsePositiveInteger(value: string | undefined, variableName: string, max?: number) {
   if (value === undefined || value.trim() === '') {
