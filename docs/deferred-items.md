@@ -4,7 +4,7 @@ These are intentionally out of scope and are not open questions.
 
 ## What Shipped (Not Deferred)
 
-A bounded delivery cursor (`lastDelivered` watermark) now lives in the server and drives the `hasFreshComments` annotation on `get_review_round`. This is ergonomics state, not policy state — it does not count rounds or enforce limits. See [docs/freshness-model.md](freshness-model.md) and [docs/review-policy.md](review-policy.md) for the distinction.
+A bounded delivery cursor (`lastDelivered` watermark) now lives in the server and drives unseen-comment filtering plus the `hasFreshComments` annotation on `get_review_round`. This is ergonomics state, not policy state — it does not count rounds or enforce limits. See [docs/freshness-model.md](freshness-model.md) and [docs/review-policy.md](review-policy.md) for the distinction.
 
 ## Explicitly Deferred
 

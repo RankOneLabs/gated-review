@@ -9,10 +9,10 @@ rounds, decide when the loop is done, or mark a pull request merge-ready.
 The server holds one bounded, non-policy piece of per-PR state: a **delivery
 cursor** (`lastDelivered` watermark) that records the latest review-thread comment timestamp
 seen on the last `get_review_round` call. This cursor drives the
-`hasFreshComments` annotation and is described fully in
+unseen-comment filter and `hasFreshComments` annotation and is described fully in
 [docs/freshness-model.md](freshness-model.md).
 
-The delivery cursor is ergonomics, not policy: it tells the agent which threads
+The delivery cursor is ergonomics, not policy: it tells the agent which comments
 it has already seen, but it does not count rounds, enforce limits, or gate any
 operator action. It is held in memory (not persisted) for the server lifetime.
 

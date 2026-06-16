@@ -42,15 +42,14 @@ requests a re-triage — "once" does not mean "never again".
 The response envelope contains:
 - `threads` — review threads, each with `state` (open/resolved), `path` (nullable),
   `line` (nullable), `hasFreshComments`, and `comments` (array with `author.kind`,
-  `author.login`, `body`, `createdAt`)
+  `author.login`, `body`, `createdAt`). After the first fetch, stale threads are
+  omitted and each returned `comments` array contains only unseen comments.
 - `openThreadCount` — total unresolved threads
-- `freshSince` — watermark timestamp; threads with `hasFreshComments: true` arrived
-  after this watermark
+- `freshSince` — watermark timestamp; returned comments arrived after this watermark
 - `summaries` — top-level summary comments from CodeRabbit or Copilot
 
-Focus triage on open threads (`state: "open"`). If `hasFreshComments` is true on a
-thread, flag it as new in the presentation. If `freshSince` is null, all threads are
-new.
+Focus triage on open threads (`state: "open"`). Returned open threads are new work.
+If `freshSince` is null, all included threads are new.
 
 ## Evaluate
 
@@ -126,8 +125,8 @@ thread without confirmation.
 
 If you call `get_review_round` again (e.g. to verify after a push) and
 `openThreadCount` has increased or any thread shows `hasFreshComments: true` on a
-previously-seen thread — stop. Present the new comments as a fresh triage before
-continuing. Do not act on stale buckets.
+previously-seen thread — stop. Present the returned comments as a fresh triage
+before continuing. Do not act on stale buckets.
 
 ## Wrap Up
 

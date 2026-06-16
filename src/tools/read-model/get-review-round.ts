@@ -291,6 +291,16 @@ function isThreadFresh(comments: ReadModelThreadComment[], prior: string | null)
   return comments.some((c) => Date.parse(c.createdAt) > priorMs);
 }
 
+function unseenThreadComments(
+  comments: ReadModelThreadComment[],
+  prior: string | null
+): ReadModelThreadComment[] {
+  if (prior === null) return comments;
+
+  const priorMs = Date.parse(prior);
+  return comments.filter((comment) => Date.parse(comment.createdAt) > priorMs);
+}
+
 export async function getReviewRound(
   input: unknown,
   context: ToolExecutionContext
@@ -406,15 +416,20 @@ export async function getReviewRound(
     openThreadCount,
     freshSince: prior,
     triagePrompt,
-    threads: threads.map((thread, index) => {
+    threads: threads.flatMap((thread, index) => {
       const threadComments = comments.value[index];
+      const visibleComments = unseenThreadComments(threadComments, prior);
+      if (visibleComments.length === 0) {
+        return [];
+      }
+
       const hasFreshComments =
-        thread.state === 'resolved' ? false : isThreadFresh(threadComments, prior);
-      return {
+        thread.state === 'resolved' ? false : isThreadFresh(visibleComments, prior);
+      return [{
         ...thread,
         hasFreshComments,
-        comments: threadComments
-      };
+        comments: visibleComments
+      }];
     }),
     summaries: summaries.value
   });

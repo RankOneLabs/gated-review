@@ -75,8 +75,8 @@ review-thread mutations.
 
 - **`hasFreshComments`** on each thread: true when the thread has comments
   newer than the `lastDelivered` watermark recorded by the server after the
-  previous call. Threads with `hasFreshComments: false` have already been
-  delivered; the agent may skip their body on re-reads.
+  previous call. Stale threads are omitted from `threads`; stale comments are
+  omitted from each returned thread's `comments` array.
 - **`freshSince`**: the watermark timestamp that was in effect when this call
   was made. Null on the first call for a PR.
 
@@ -85,7 +85,7 @@ The resolve discipline is the mechanism that keeps the watermark meaningful:
 If the agent resolves threads promptly after each approved outcome, the
 watermark accurately separates already-handled threads from newly arrived ones
 on the next round. If the agent skips resolution, all threads continue to
-appear fresh on every call.
+count as unresolved, but only unseen comments are returned.
 
 See [docs/freshness-model.md](freshness-model.md) for a full explanation of
 how the watermark is produced and its in-memory storage model.
