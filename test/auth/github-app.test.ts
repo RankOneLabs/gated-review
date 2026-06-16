@@ -25,7 +25,7 @@ describe('GitHub app config loading', () => {
         privateKey: '-----BEGIN PRIVATE KEY-----\nline-one\n-----END PRIVATE KEY-----',
         apiBaseUrl: 'https://example.com/api',
         graphqlUrl: 'https://api.github.com/graphql',
-        copilotReviewerLogin: 'copilot[bot]',
+        copilotReviewerLogin: 'copilot-pull-request-reviewer',
         httpPort: 3000
       });
     }
@@ -49,7 +49,7 @@ describe('GitHub app config loading', () => {
       expect(result.value.privateKey).toBe(pem);
       expect(result.value.apiBaseUrl).toBe('https://api.github.com');
       expect(result.value.graphqlUrl).toBe('https://api.github.com/graphql');
-      expect(result.value.copilotReviewerLogin).toBe('copilot[bot]');
+      expect(result.value.copilotReviewerLogin).toBe('copilot-pull-request-reviewer');
       expect(result.value.httpPort).toBe(3000);
     }
   });

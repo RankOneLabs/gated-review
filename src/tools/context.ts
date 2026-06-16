@@ -11,7 +11,7 @@ export type ToolExecutionContext = Readonly<{
 
 export function createToolExecutionContext(
   github: GitHubClient,
-  copilotReviewerLogin = 'copilot[bot]',
+  copilotReviewerLogin = 'copilot-pull-request-reviewer',
   freshness?: FreshnessStore
 ): ToolExecutionContext {
   return { github, copilotReviewerLogin, freshness };
