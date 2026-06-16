@@ -190,6 +190,65 @@ function createGitHubClientMock(prState: 'OPEN' | 'CLOSED' | 'MERGED' = 'OPEN') 
   return { github, request };
 }
 
+function createGitHubClientMockWithInvalidCommentTimestamp() {
+  const request = vi.fn(async (requestInput: { query: string; variables?: Record<string, unknown> }) => {
+    if (requestInput.query === reviewRoundThreadsQuery) {
+      return makeThreadsResponse();
+    }
+
+    if (requestInput.query === reviewThreadCommentsQuery) {
+      if (requestInput.variables?.id === 'thread-open') {
+        return ok({
+          node: {
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-invalid',
+                  body: 'invalid timestamp',
+                  createdAt: 'not-a-date',
+                  author: {
+                    login: 'alice'
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: false,
+                endCursor: null
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (requestInput.query === reviewRoundSummariesQuery) {
+      return ok({
+        repository: {
+          pullRequest: {
+            comments: {
+              nodes: [],
+              pageInfo: {
+                hasNextPage: false,
+                endCursor: null
+              }
+            }
+          }
+        }
+      });
+    }
+
+    throw new Error(`Unexpected query: ${requestInput.query}`);
+  });
+
+  const github = {
+    graphql: {
+      request
+    }
+  } as unknown as GitHubClient;
+
+  return { github };
+}
+
 describe('getReviewRound', () => {
   it('returns unresolved threads by default with ordered comments and summary capture', async () => {
     const { github, request } = createGitHubClientMock();
@@ -414,10 +473,45 @@ describe('getReviewRound', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.freshSince).toBe('not-a-date');
+      expect(result.value.freshSince).toBeNull();
       expect(result.value.threads).toHaveLength(1);
       expect(result.value.threads[0].hasFreshComments).toBe(true);
       expect(result.value.threads[0].comments).toHaveLength(2);
+    }
+  });
+
+  it('treats invalid comment timestamps as unseen and fresh', async () => {
+    const { github } = createGitHubClientMockWithInvalidCommentTimestamp();
+    const freshness = createInMemoryFreshnessStore();
+    const prKey = makeRepoPrKey({ owner: 'openai', repo: 'gated-review' }, 42);
+    freshness.record(prKey, '2026-06-02T12:00:00.000Z');
+
+    const result = await getReviewRound(
+      { repository: 'openai/gated-review', pullRequestNumber: 42 },
+      {
+        github,
+        copilotReviewerLogin: 'github-copilot[bot]',
+        freshness
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.freshSince).toBe('2026-06-02T12:00:00.000Z');
+      expect(result.value.threads).toHaveLength(1);
+      expect(result.value.threads[0].hasFreshComments).toBe(true);
+      expect(result.value.threads[0].comments).toEqual([
+        {
+          id: 'comment-invalid',
+          body: 'invalid timestamp',
+          createdAt: 'not-a-date',
+          author: {
+            login: 'alice',
+            kind: 'human'
+          }
+        }
+      ]);
+      expect(freshness.lastDeliveredAt(prKey)).toBe('2026-06-02T12:00:00.000Z');
     }
   });
 

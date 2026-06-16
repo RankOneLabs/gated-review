@@ -14,7 +14,9 @@ A thread is unresolved when GitHub's `isResolved` flag is false. The server coun
 
 The server records the latest `createdAt` timestamp seen across all review-thread comments fetched by a `get_review_round` call. Summary comments (issue comments from CodeRabbit or Copilot) are returned in the response but do not advance the watermark. On subsequent calls for the same PR, each thread's `comments` array is filtered to comments newer than that watermark. Threads with no unseen comments are omitted from `threads`; returned unresolved threads are flagged `hasFreshComments: true`.
 
-`freshSince` in the `get_review_round` response is the watermark value that was in effect when that call was made. It is null on the first call for a PR.
+`freshSince` in the `get_review_round` response is the valid watermark value that was in effect when that call was made. It is null on the first call for a PR. If stored freshness state is invalid or unparseable, the server treats it as absent, returns `freshSince: null`, and over-delivers rather than omitting comments.
+
+If an individual review comment has an unparseable `createdAt`, the server treats that comment as unseen and fresh. Invalid comment timestamps also do not advance the stored watermark.
 
 ## Storage: In-Memory, Not Persisted
 

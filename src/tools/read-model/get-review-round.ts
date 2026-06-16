@@ -292,9 +292,16 @@ function parseFreshnessTimestamp(timestamp: string | null): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+function validFreshSince(timestamp: string | null): string | null {
+  return parseFreshnessTimestamp(timestamp) === null ? null : timestamp;
+}
+
 function isThreadFresh(comments: ReadModelThreadComment[], priorMs: number | null): boolean {
   if (priorMs === null) return true;
-  return comments.some((c) => Date.parse(c.createdAt) > priorMs);
+  return comments.some((comment) => {
+    const commentMs = Date.parse(comment.createdAt);
+    return Number.isNaN(commentMs) || commentMs > priorMs;
+  });
 }
 
 function unseenThreadComments(
@@ -303,7 +310,10 @@ function unseenThreadComments(
 ): ReadModelThreadComment[] {
   if (priorMs === null) return comments;
 
-  return comments.filter((comment) => Date.parse(comment.createdAt) > priorMs);
+  return comments.filter((comment) => {
+    const commentMs = Date.parse(comment.createdAt);
+    return Number.isNaN(commentMs) || commentMs > priorMs;
+  });
 }
 
 export async function getReviewRound(
@@ -395,13 +405,14 @@ export async function getReviewRound(
   const key = makeRepoPrKey(repoRef.value, parsedInput.pullRequestNumber);
   const prior = context.freshness?.lastDeliveredAt(key) ?? null;
   const priorMs = parseFreshnessTimestamp(prior);
+  const freshSince = validFreshSince(prior);
 
   let maxCreatedAt: string | null = null;
   let maxCreatedAtMs = -Infinity;
   for (const threadComments of comments.value) {
     for (const comment of threadComments) {
       const ms = Date.parse(comment.createdAt);
-      if (ms > maxCreatedAtMs) {
+      if (!Number.isNaN(ms) && ms > maxCreatedAtMs) {
         maxCreatedAtMs = ms;
         maxCreatedAt = comment.createdAt;
       }
@@ -420,7 +431,7 @@ export async function getReviewRound(
     pullRequestNumber: parsedInput.pullRequestNumber,
     includeResolved: parsedInput.includeResolved ?? false,
     openThreadCount,
-    freshSince: prior,
+    freshSince,
     triagePrompt,
     threads: threads.flatMap((thread, index) => {
       const threadComments = comments.value[index];
