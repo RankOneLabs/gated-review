@@ -304,6 +304,12 @@ export const prStatusOutputSchema = z
   .object({
     pullRequestNumber: z.number().int().positive(),
     state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+    url: z.url(),
+    headOwner: z.string().min(1).nullable(),
+    headBranch: z.string().min(1),
+    headSha: z.string().min(1),
+    baseBranch: z.string().min(1),
+    mergedAt: z.iso.datetime().nullable(),
     openThreadCount: z.number().int().nonnegative(),
     mergeReady: mergeReadyStateSchema,
     checks: readModelChecksSummarySchema

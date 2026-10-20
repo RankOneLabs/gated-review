@@ -90,7 +90,12 @@ export type GraphQLPrStatusQueryData = Readonly<{
   repository: Readonly<{
     pullRequest: Readonly<{
       state: GraphQLPrState;
+      url: string;
+      headRepositoryOwner: Readonly<{ login: string }> | null;
+      headRefName: string;
       headRefOid: string;
+      baseRefName: string;
+      mergedAt: string | null;
       reviewThreads: Readonly<{
         nodes: ReadonlyArray<Readonly<{ isResolved: boolean }>>;
         pageInfo: GraphQLPageInfo;
@@ -180,7 +185,12 @@ export const prStatusQuery = `
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
         state
+        url
+        headRepositoryOwner { login }
+        headRefName
         headRefOid
+        baseRefName
+        mergedAt
         reviewThreads(first: 100, after: $after) {
           nodes {
             isResolved
