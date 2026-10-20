@@ -312,6 +312,7 @@ describe('read-model integration', () => {
       ok: true,
       value: {
         pullRequestNumber: 42,
+        state: 'OPEN',
         openThreadCount: 1,
         mergeReady: {
           isReady: true,

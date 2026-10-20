@@ -21,6 +21,7 @@ function createGitHubClientMock() {
         return ok({
           repository: {
             pullRequest: {
+              state: 'OPEN',
               headRefOid: 'head-sha-123',
               reviewThreads: {
                 nodes: [
@@ -41,6 +42,7 @@ function createGitHubClientMock() {
         return ok({
           repository: {
             pullRequest: {
+              state: 'OPEN',
               headRefOid: 'head-sha-123',
               reviewThreads: {
                 nodes: [{ isResolved: false }],
@@ -118,7 +120,7 @@ function createGitHubClientMock() {
 }
 
 describe('getPrStatus', () => {
-  it('reads open-thread counts, merge-ready labels, and check state from GitHub', async () => {
+  it('reads PR state, open-thread counts, merge-ready labels, and check state from GitHub', async () => {
     const { github, request, rest } = createGitHubClientMock();
 
     const result = await getPrStatus(
@@ -144,6 +146,7 @@ describe('getPrStatus', () => {
     if (result.ok) {
       expect(result.value).toEqual({
         pullRequestNumber: 42,
+        state: 'OPEN',
         openThreadCount: 2,
         mergeReady: {
           isReady: true,
@@ -171,6 +174,7 @@ describe('getPrStatus', () => {
         return ok({
           repository: {
             pullRequest: {
+              state: 'OPEN',
               headRefOid: 'head-sha-123',
               reviewThreads: {
                 nodes: [{ isResolved: false }],
@@ -287,7 +291,7 @@ describe('getPrStatus', () => {
       freshness.record(key, '2026-06-01T12:00:00.000Z');
       expect(freshness.lastDeliveredAt(key)).not.toBeNull();
 
-      await getPrStatus(
+      const result = await getPrStatus(
         { repository: 'openai/gated-review', pullRequestNumber: 42 },
         {
           github: makeTerminalMock(prState),
@@ -296,6 +300,7 @@ describe('getPrStatus', () => {
         }
       );
 
+      expect(result.ok && result.value.state).toBe(prState);
       expect(freshness.lastDeliveredAt(key)).toBeNull();
     }
   });

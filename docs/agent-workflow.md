@@ -64,7 +64,8 @@ on its own.
 
 During triage, the triage skill calls `get_review_round` to read the current
 unresolved review threads. The agent may inspect `pr_status` for advisory
-context, but `pr_status` is not a gate.
+context, including the PR's `state` (`OPEN`, `CLOSED`, or `MERGED`), but
+`pr_status` is not a gate.
 
 The agent should wait for operator-approved triage outcomes before applying
 review-thread mutations.

@@ -303,6 +303,7 @@ export const prStatusInputSchema = z
 export const prStatusOutputSchema = z
   .object({
     pullRequestNumber: z.number().int().positive(),
+    state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
     openThreadCount: z.number().int().nonnegative(),
     mergeReady: mergeReadyStateSchema,
     checks: readModelChecksSummarySchema
