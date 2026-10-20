@@ -80,6 +80,12 @@ export type MergeReadyState = Readonly<{
 export type PullRequestStatus = Readonly<{
   pullRequestNumber: number;
   state: GraphQLPrState;
+  url: string;
+  headOwner: string | null;
+  headBranch: string;
+  headSha: string;
+  baseBranch: string;
+  mergedAt: string | null;
   openThreadCount: number;
   mergeReady: MergeReadyState;
   checks: ReadModelChecksSummary;

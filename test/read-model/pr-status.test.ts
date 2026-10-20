@@ -22,7 +22,12 @@ function createGitHubClientMock() {
           repository: {
             pullRequest: {
               state: 'OPEN',
+              url: 'https://github.com/openai/gated-review/pull/42',
+              headRepositoryOwner: { login: 'openai' },
+              headRefName: 'feature',
               headRefOid: 'head-sha-123',
+              baseRefName: 'main',
+              mergedAt: null,
               reviewThreads: {
                 nodes: [
                   { isResolved: false },
@@ -43,7 +48,12 @@ function createGitHubClientMock() {
           repository: {
             pullRequest: {
               state: 'OPEN',
+              url: 'https://github.com/openai/gated-review/pull/42',
+              headRepositoryOwner: { login: 'openai' },
+              headRefName: 'feature',
               headRefOid: 'head-sha-123',
+              baseRefName: 'main',
+              mergedAt: null,
               reviewThreads: {
                 nodes: [{ isResolved: false }],
                 pageInfo: {
@@ -147,6 +157,12 @@ describe('getPrStatus', () => {
       expect(result.value).toEqual({
         pullRequestNumber: 42,
         state: 'OPEN',
+        url: 'https://github.com/openai/gated-review/pull/42',
+        headOwner: 'openai',
+        headBranch: 'feature',
+        headSha: 'head-sha-123',
+        baseBranch: 'main',
+        mergedAt: null,
         openThreadCount: 2,
         mergeReady: {
           isReady: true,
@@ -175,7 +191,12 @@ describe('getPrStatus', () => {
           repository: {
             pullRequest: {
               state: 'OPEN',
+              url: 'https://github.com/openai/gated-review/pull/42',
+              headRepositoryOwner: { login: 'openai' },
+              headRefName: 'feature',
               headRefOid: 'head-sha-123',
+              baseRefName: 'main',
+              mergedAt: null,
               reviewThreads: {
                 nodes: [{ isResolved: false }],
                 pageInfo: {
@@ -249,7 +270,12 @@ describe('getPrStatus', () => {
             repository: {
               pullRequest: {
                 state: prState,
+                url: 'https://github.com/openai/gated-review/pull/42',
+                headRepositoryOwner: { login: 'openai' },
+                headRefName: 'feature',
                 headRefOid: 'head-sha-123',
+                baseRefName: 'main',
+                mergedAt: prState === 'MERGED' ? '2026-06-01T12:00:00.000Z' : null,
                 reviewThreads: {
                   nodes: [],
                   pageInfo: { hasNextPage: false, endCursor: null }

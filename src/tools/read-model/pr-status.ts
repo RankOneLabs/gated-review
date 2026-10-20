@@ -63,10 +63,9 @@ async function loadOpenThreadCount(
   context: ToolExecutionContext,
   repository: RepositoryRef,
   pullRequestNumber: number
-): Promise<Result<{ openThreadCount: number; headRefOid: string; prState: GraphQLPrState }, ToolDomainError>> {
+): Promise<Result<{ openThreadCount: number; pullRequest: NonNullable<NonNullable<GraphQLPrStatusQueryData['repository']>['pullRequest']> }, ToolDomainError>> {
   let after: string | null = null;
-  let headRefOid: string | null = null;
-  let prState: GraphQLPrState | null = null;
+  let firstPullRequest: NonNullable<NonNullable<GraphQLPrStatusQueryData['repository']>['pullRequest']> | null = null;
   let openThreadCount = 0;
 
   while (true) {
@@ -82,8 +81,7 @@ async function loadOpenThreadCount(
       );
     }
 
-    headRefOid = headRefOid ?? pullRequest.headRefOid;
-    prState = prState ?? pullRequest.state;
+    firstPullRequest ??= pullRequest;
 
     for (const thread of pullRequest.reviewThreads.nodes) {
       if (!thread.isResolved) {
@@ -104,14 +102,13 @@ async function loadOpenThreadCount(
     after = pullRequest.reviewThreads.pageInfo.endCursor;
   }
 
-  if (!headRefOid || !prState) {
+  if (!firstPullRequest) {
     return err(githubRequestFailedError(operationName, `Pull request #${pullRequestNumber} was not found.`));
   }
 
   return ok({
     openThreadCount,
-    headRefOid,
-    prState
+    pullRequest: firstPullRequest
   });
 }
 
@@ -137,7 +134,7 @@ export async function getPrStatus(
 
   const freshness = context.freshness;
   const isTerminalState =
-    openThreads.value.prState === 'CLOSED' || openThreads.value.prState === 'MERGED';
+    openThreads.value.pullRequest.state === 'CLOSED' || openThreads.value.pullRequest.state === 'MERGED';
 
   const mergeReady = await loadMergeReadyState(context, repoRef.value, parsedInput.pullRequestNumber);
   if (!mergeReady.ok) {
@@ -146,7 +143,7 @@ export async function getPrStatus(
 
   const status = await context.github.rest.getCommitCombinedStatus(
     repoRef.value,
-    openThreads.value.headRefOid
+    openThreads.value.pullRequest.headRefOid
   );
   if (!status.ok) {
     return err(mapGitHubError(status.error));
@@ -161,7 +158,13 @@ export async function getPrStatus(
 
   return ok({
     pullRequestNumber: parsedInput.pullRequestNumber,
-    state: openThreads.value.prState,
+    state: openThreads.value.pullRequest.state,
+    url: openThreads.value.pullRequest.url,
+    headOwner: openThreads.value.pullRequest.headRepositoryOwner?.login ?? null,
+    headBranch: openThreads.value.pullRequest.headRefName,
+    headSha: openThreads.value.pullRequest.headRefOid,
+    baseBranch: openThreads.value.pullRequest.baseRefName,
+    mergedAt: openThreads.value.pullRequest.mergedAt,
     openThreadCount: openThreads.value.openThreadCount,
     mergeReady: {
       isReady: mergeReady.value,

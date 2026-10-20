@@ -140,7 +140,12 @@ function createMockContext(): ToolExecutionContext {
         repository: {
           pullRequest: {
             state: 'OPEN',
+            url: 'https://github.com/openai/gated-review/pull/42',
+            headRepositoryOwner: { login: 'openai' },
+            headRefName: 'feature',
             headRefOid: 'head-sha-123',
+            baseRefName: 'main',
+            mergedAt: null,
             reviewThreads: {
               nodes: [
                 { isResolved: false },
@@ -354,6 +359,12 @@ describe('tool shaped outputs', () => {
       {
         pullRequestNumber: 42,
         state: 'OPEN',
+        url: 'https://github.com/openai/gated-review/pull/42',
+        headOwner: 'openai',
+        headBranch: 'feature',
+        headSha: 'head-sha-123',
+        baseBranch: 'main',
+        mergedAt: null,
         openThreadCount: 1,
         mergeReady: {
           isReady: true,
