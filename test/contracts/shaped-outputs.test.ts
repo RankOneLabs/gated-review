@@ -353,6 +353,7 @@ describe('tool shaped outputs', () => {
       prStatusOutputSchema,
       {
         pullRequestNumber: 42,
+        state: 'OPEN',
         openThreadCount: 1,
         mergeReady: {
           isReady: true,

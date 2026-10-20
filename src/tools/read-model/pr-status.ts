@@ -104,14 +104,14 @@ async function loadOpenThreadCount(
     after = pullRequest.reviewThreads.pageInfo.endCursor;
   }
 
-  if (!headRefOid) {
+  if (!headRefOid || !prState) {
     return err(githubRequestFailedError(operationName, `Pull request #${pullRequestNumber} was not found.`));
   }
 
   return ok({
     openThreadCount,
     headRefOid,
-    prState: prState ?? 'OPEN'
+    prState
   });
 }
 
@@ -161,6 +161,7 @@ export async function getPrStatus(
 
   return ok({
     pullRequestNumber: parsedInput.pullRequestNumber,
+    state: openThreads.value.prState,
     openThreadCount: openThreads.value.openThreadCount,
     mergeReady: {
       isReady: mergeReady.value,

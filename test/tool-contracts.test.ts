@@ -691,6 +691,7 @@ describe('tool contracts', () => {
     expect(
       prStatusOutputSchema.parse({
         pullRequestNumber: 42,
+        state: 'OPEN',
         openThreadCount: 1,
         mergeReady: {
           isReady: true,
@@ -707,6 +708,7 @@ describe('tool contracts', () => {
       })
     ).toEqual({
       pullRequestNumber: 42,
+      state: 'OPEN',
       openThreadCount: 1,
       mergeReady: {
         isReady: true,
@@ -892,6 +894,7 @@ describe('tool contracts', () => {
           ok: true,
           value: {
             pullRequestNumber: 42,
+            state: 'OPEN',
             openThreadCount: 1,
             mergeReady: {
               isReady: true,

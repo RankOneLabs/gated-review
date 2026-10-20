@@ -1,3 +1,5 @@
+import type { GraphQLPrState } from '#root/src/tools/read-model/graphql-queries.js';
+
 export type ReadModelEntityKind = 'coderabbit' | 'copilot' | 'human';
 
 export type ReadModelEntity = Readonly<{
@@ -77,6 +79,7 @@ export type MergeReadyState = Readonly<{
 
 export type PullRequestStatus = Readonly<{
   pullRequestNumber: number;
+  state: GraphQLPrState;
   openThreadCount: number;
   mergeReady: MergeReadyState;
   checks: ReadModelChecksSummary;
