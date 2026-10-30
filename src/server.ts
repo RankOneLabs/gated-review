@@ -1,4 +1,4 @@
-import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -9,6 +9,13 @@ import { loadGitHubAppConfig } from '#root/src/config.js';
 import { describeToolError, validationRejectedError } from '#root/src/errors.js';
 import { isOk } from '#root/src/result.js';
 import { createToolRegistry } from '#root/src/tools/registry.js';
+import {
+  surfaceForPath,
+  surfaceLabel,
+  toolsForSurface,
+  unscopedAgentSurface,
+  type McpSurface
+} from '#root/src/tools/agent-roles.js';
 import { createToolExecutionContext, type ToolExecutionContext } from '#root/src/tools/context.js';
 import { createInMemoryFreshnessStore } from '#root/src/tools/freshness-store.js';
 import { reviewDecisionOutputSchema } from '#root/src/tools/schemas.js';
@@ -16,7 +23,12 @@ import type { ZodTypeAny } from 'zod';
 
 import type { ToolContract } from '#root/src/tools/types.js';
 
-let loggedAgentToolStartup = false;
+const loggedSurfaceStartup = new Set<string>();
+
+export type McpSession = Readonly<{
+  transport: StreamableHTTPServerTransport;
+  surface: McpSurface;
+}>;
 
 function createToolHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
   return async (input: unknown) => {
@@ -77,25 +89,24 @@ function createToolHandler(tool: ToolContract<ZodTypeAny, ZodTypeAny, string>) {
   };
 }
 
-export function createServer(context: ToolExecutionContext) {
+export function createServer(context: ToolExecutionContext, surface: McpSurface = unscopedAgentSurface) {
   const server = new McpServer({
     name: 'gated-review',
     version: '0.1.0'
   });
 
-  const agentTools = createToolRegistry(context).filter((tool) =>
-    tool.actorScopes.some((scope) => scope === 'agent')
-  );
+  const agentTools = toolsForSurface(createToolRegistry(context), surface);
 
-  // createServer() runs per HTTP MCP session; log the agent tool surface once
-  // per process so multi-client usage doesn't flood the logs with identical lines.
-  if (!loggedAgentToolStartup) {
+  // createServer() runs per HTTP MCP session; log each tool surface once per
+  // process so multi-client usage doesn't flood the logs with identical lines.
+  const label = surfaceLabel(surface);
+  if (!loggedSurfaceStartup.has(label)) {
     const agentToolNames = agentTools.map((tool) => tool.name);
     console.info('[gated-review] server.start', {
       operation: 'server.start',
-      detail: `agent tools: ${agentToolNames.join(', ')}`
+      detail: `${label} tools: ${agentToolNames.join(', ')}`
     });
-    loggedAgentToolStartup = true;
+    loggedSurfaceStartup.add(label);
   }
 
   for (const tool of agentTools) {
@@ -112,6 +123,60 @@ export function createServer(context: ToolExecutionContext) {
   }
 
   return server;
+}
+
+// Routes `/mcp` to the unscoped agent surface and `/mcp/<role>` to that role's surface.
+// A session stays on the surface it was initialized on.
+export function createMcpRequestHandler(context: ToolExecutionContext, sessions: Map<string, McpSession>) {
+  return async (req: IncomingMessage, res: ServerResponse) => {
+    try {
+      const surface = surfaceForPath(req.url);
+      if (surface === null) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+
+      const sessionId = req.headers['mcp-session-id'];
+
+      if (typeof sessionId === 'string') {
+        const session = sessions.get(sessionId);
+        if (session === undefined || surfaceLabel(session.surface) !== surfaceLabel(surface)) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Session not found' }));
+          return;
+        }
+        await session.transport.handleRequest(req, res);
+        return;
+      }
+
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        // Every gated-review tool is a bounded request/response — nothing streams and no
+        // tool emits mid-call progress — so reply in plain application/json rather than SSE
+        // frames. Clients must still advertise text/event-stream in Accept per the MCP spec
+        // (the SDK enforces this); this only changes how unary responses are encoded.
+        enableJsonResponse: true,
+        onsessioninitialized: (id) => {
+          sessions.set(id, { transport, surface });
+        },
+        onsessionclosed: (id) => {
+          sessions.delete(id);
+        }
+      });
+
+      const server = createServer(context, surface);
+      await server.connect(transport);
+      await transport.handleRequest(req, res);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[gated-review] request error', { detail: message });
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
+    }
+  };
 }
 
 export async function runHttpServer() {
@@ -131,55 +196,7 @@ export async function runHttpServer() {
     createInMemoryFreshnessStore()
   );
 
-  const sessions = new Map<string, StreamableHTTPServerTransport>();
-
-  const httpServer = createHttpServer(async (req, res) => {
-    try {
-      if (req.url !== '/mcp') {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Not found' }));
-        return;
-      }
-
-      const sessionId = req.headers['mcp-session-id'];
-
-      if (typeof sessionId === 'string') {
-        if (!sessions.has(sessionId)) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Session not found' }));
-          return;
-        }
-        await sessions.get(sessionId)!.handleRequest(req, res);
-        return;
-      }
-
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        // Every gated-review tool is a bounded request/response — nothing streams and no
-        // tool emits mid-call progress — so reply in plain application/json rather than SSE
-        // frames. Clients must still advertise text/event-stream in Accept per the MCP spec
-        // (the SDK enforces this); this only changes how unary responses are encoded.
-        enableJsonResponse: true,
-        onsessioninitialized: (id) => {
-          sessions.set(id, transport);
-        },
-        onsessionclosed: (id) => {
-          sessions.delete(id);
-        }
-      });
-
-      const server = createServer(context);
-      await server.connect(transport);
-      await transport.handleRequest(req, res);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[gated-review] request error', { detail: message });
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal server error' }));
-      }
-    }
-  });
+  const httpServer = createHttpServer(createMcpRequestHandler(context, new Map()));
 
   const { httpPort } = configResult.value;
 

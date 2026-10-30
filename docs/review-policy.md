@@ -55,6 +55,13 @@ themselves.
 `maxReviewRounds` is advisory. It must not automatically set `merge-ready`, call
 `merge_pr`, resolve threads, or suppress human gates.
 
+## Draft Status
+
+On the role endpoints, a builder opens pull requests only as drafts and an
+assessor alone can mark one ready for review. Ready-for-review is the assessor's
+signal that the work passed assessment; it is not MergeReady. `merge_pr` still
+enforces only the `merge-ready` label, which remains the operator's.
+
 ## Server Boundary
 
 The server continues to treat `MergeReady` as a human assertion recorded with

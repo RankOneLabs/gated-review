@@ -30,7 +30,7 @@ Discovery mode covers `git.*` operations too — the owner is taken from the rep
 
 **No `GITHUB_REPOSITORY`.** The server is multi-repo: the repository is supplied by the agent on each tool call, not pinned at startup. The App's installation(s) must have access to every repository the agent targets.
 
-**No `GATED_REVIEW_ACTOR`.** The MCP surface is agent-only; operator verbs are absent from it by construction, not by a runtime switch. There is no actor variable to set.
+**No `GATED_REVIEW_ACTOR`.** The MCP surface is agent-only; operator verbs are absent from it by construction, not by a runtime switch. There is no actor variable to set. An agent role (`builder`, `assessor`) is chosen per session by the endpoint path the client connects to, not by configuration (see [agent workflow](agent-workflow.md#role-scoped-endpoints)).
 
 **No state-DB path.** Freshness state is held in memory for the lifetime of the process. It is not persisted to disk and requires no database or file path. See [docs/freshness-model.md](freshness-model.md) for the rationale.
 

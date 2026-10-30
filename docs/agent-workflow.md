@@ -32,6 +32,31 @@ they are never registered, not merely hidden behind a runtime check:
 The agent must not try to recreate those operations through another GitHub
 surface.
 
+## Role-Scoped Endpoints
+
+`/mcp` serves the agent surface above. An orchestrator that runs agents in
+fixed roles connects each session to a role endpoint instead, and the role
+fixes the session's tools for its lifetime:
+
+| tool | `/mcp/builder` | `/mcp/assessor` | `/mcp` |
+|---|---|---|---|
+| `open_pr` | always opens a draft; `draft: false` is rejected | absent | as given |
+| `set_pr_draft` | absent | `draft: false` only; `draft: true` is rejected | absent |
+| `git.push`, `git.pull`, `reply_to_thread`, `resolve_thread`, `request_next_round` | present | absent | present |
+| `git.fetch`, `get_review_round`, `pr_status`, `review.*` | present | present | present |
+
+So a builder can only open draft pull requests, and only an assessor can mark
+one ready for review. A rejected call is logged as `[gated-review] tool
+rejection` with the role, tool and repository in its detail.
+
+The role is chosen by the endpoint the orchestrator configures, which the agent
+cannot edit. It is not authentication: anything on the tailnet can still reach
+`/mcp` directly (see [deferred items](deferred-items.md)).
+
+`set_pr_draft` takes `repository`, `pullRequestNumber` and `draft`, and returns
+`{ number, url, isDraft }`. When the pull request is already in the requested
+state it returns that state without a mutation. `pr_status` reports `isDraft`.
+
 ## Repository Argument
 
 Every tool that targets a repository or pull request accepts a `repository`
@@ -50,7 +75,8 @@ not, the tool returns an authorization error. See
 2. Commit locally.
 3. Push through `git.push` (with `repository`) so remote credentials stay
    behind the server.
-4. Open the pull request with `open_pr`.
+4. Open the pull request with `open_pr`. On `/mcp/builder` it opens as a
+   draft; an assessor marks it ready with `set_pr_draft`.
 
 Local-only git operations such as staging, committing, branching, merging, and
 rebasing stay in the shell. Remote git operations such as push, pull, and fetch

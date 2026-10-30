@@ -59,6 +59,11 @@ const inputFixtures: Readonly<Record<string, unknown>> = {
     body: 'Ship it',
     draft: true
   },
+  set_pr_draft: {
+    repository: 'openai/gated-review',
+    pullRequestNumber: 17,
+    draft: false
+  },
   reply_to_thread: {
     repository: 'openai/gated-review',
     threadId: 'thread-123',
@@ -281,6 +286,51 @@ function createMockContext(): ToolExecutionContext {
           );
         }
 
+        if (request.operationName === 'PullRequestDraftState') {
+          return new Response(
+            JSON.stringify({
+              data: {
+                repository: {
+                  pullRequest: {
+                    id: 'PR_node_17',
+                    number: 17,
+                    url: 'https://github.com/openai/gated-review/pull/17',
+                    isDraft: true
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        if (request.operationName === 'MarkPullRequestReadyForReview') {
+          return new Response(
+            JSON.stringify({
+              data: {
+                markPullRequestReadyForReview: {
+                  pullRequest: {
+                    number: 17,
+                    url: 'https://github.com/openai/gated-review/pull/17',
+                    isDraft: false
+                  }
+                }
+              }
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
         if (request.operationName === 'AddPullRequestReviewThreadReply') {
           return new Response(
             JSON.stringify({
@@ -411,6 +461,7 @@ function createMockContext(): ToolExecutionContext {
                   pullRequest: {
                     state: 'OPEN',
                     url: 'https://github.com/openai/gated-review/pull/42',
+                    isDraft: false,
                     headRepositoryOwner: { login: 'openai' },
                     headRefName: 'feature',
                     headRefOid: 'head-sha-123',
@@ -515,6 +566,7 @@ describe('tool contracts', () => {
       'review.record_event',
       'review.apply_decision',
       'open_pr',
+      'set_pr_draft',
       'reply_to_thread',
       'resolve_thread',
       'request_next_round',
@@ -546,6 +598,7 @@ describe('tool contracts', () => {
       'operator'
     ]);
     expect(toolRegistry.find((tool) => tool.name === 'open_pr')?.actorScopes).toEqual(['agent']);
+    expect(toolRegistry.find((tool) => tool.name === 'set_pr_draft')?.actorScopes).toEqual(['operator']);
     expect(toolRegistry.find((tool) => tool.name === 'reply_to_thread')?.actorScopes).toEqual([
       'agent'
     ]);
@@ -592,6 +645,7 @@ describe('tool contracts', () => {
       'review.record_event.output',
       'review.apply_decision.output',
       'open_pr.output',
+      'set_pr_draft.output',
       'reply_to_thread.output',
       'resolve_thread.output',
       'request_next_round.output',
@@ -698,6 +752,7 @@ describe('tool contracts', () => {
         pullRequestNumber: 42,
         state: 'OPEN',
         url: 'https://github.com/openai/gated-review/pull/42',
+        isDraft: false,
         headOwner: 'openai',
         headBranch: 'feature',
         headSha: 'abc123',
@@ -721,6 +776,7 @@ describe('tool contracts', () => {
       pullRequestNumber: 42,
       state: 'OPEN',
       url: 'https://github.com/openai/gated-review/pull/42',
+      isDraft: false,
       headOwner: 'openai',
       headBranch: 'feature',
       headSha: 'abc123',
@@ -858,6 +914,15 @@ describe('tool contracts', () => {
             state: 'open'
           }
         });
+      } else if (tool.name === 'set_pr_draft') {
+        expect(result).toEqual({
+          ok: true,
+          value: {
+            number: 17,
+            url: 'https://github.com/openai/gated-review/pull/17',
+            isDraft: false
+          }
+        });
       } else if (
         tool.name === 'reply_to_thread' ||
         tool.name === 'resolve_thread' ||
@@ -913,6 +978,7 @@ describe('tool contracts', () => {
             pullRequestNumber: 42,
             state: 'OPEN',
             url: 'https://github.com/openai/gated-review/pull/42',
+            isDraft: false,
             headOwner: 'openai',
             headBranch: 'feature',
             headSha: 'head-sha-123',

@@ -1,12 +1,13 @@
 Bounded MCP server for agent-driven GitHub PR reviews across multiple repositories, with enforced triage and merge gates.
 
-The server runs as a long-lived HTTP service (Streamable HTTP MCP transport). Agents connect to a single endpoint and supply the target repository on each tool call — no per-repository server instances, no stdio sessions.
+The server runs as a long-lived HTTP service (Streamable HTTP MCP transport). Agents connect to a single endpoint (`/mcp`, or a role endpoint such as `/mcp/builder`) and supply the target repository on each tool call — no per-repository server instances, no stdio sessions.
 
 ## What It Ships
 
 - Curated MCP tools for read-model inspection, review mutations, git gateway operations, and operator actions.
 - Schema-shaped outputs that are validated at the registry boundary.
 - Actor-scoped tool exposure: operator-only tools are absent from the agent-facing surface by construction, not by a runtime flag.
+- Role-scoped endpoints: `/mcp/builder` opens pull requests only as drafts, and `/mcp/assessor` can only mark them ready for review (see [agent workflow](docs/agent-workflow.md#role-scoped-endpoints)).
 - Per-PR freshness watermarks held in memory for the server lifetime.
 - No `github_raw` passthrough or uncurated GitHub escape hatch.
 

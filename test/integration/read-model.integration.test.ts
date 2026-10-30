@@ -146,6 +146,7 @@ function createMockContext() {
                 pullRequest: {
                   state: 'OPEN',
                   url: 'https://github.com/openai/gated-review/pull/42',
+                  isDraft: false,
                   headRepositoryOwner: { login: 'openai' },
                   headRefName: 'feature',
                   headRefOid: 'head-sha-123',
@@ -319,6 +320,7 @@ describe('read-model integration', () => {
         pullRequestNumber: 42,
         state: 'OPEN',
         url: 'https://github.com/openai/gated-review/pull/42',
+        isDraft: false,
         headOwner: 'openai',
         headBranch: 'feature',
         headSha: 'head-sha-123',

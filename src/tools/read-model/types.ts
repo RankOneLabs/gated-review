@@ -81,6 +81,7 @@ export type PullRequestStatus = Readonly<{
   pullRequestNumber: number;
   state: GraphQLPrState;
   url: string;
+  isDraft: boolean;
   headOwner: string | null;
   headBranch: string;
   headSha: string;

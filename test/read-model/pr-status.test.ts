@@ -23,6 +23,7 @@ function createGitHubClientMock() {
             pullRequest: {
               state: 'OPEN',
               url: 'https://github.com/openai/gated-review/pull/42',
+              isDraft: true,
               headRepositoryOwner: { login: 'openai' },
               headRefName: 'feature',
               headRefOid: 'head-sha-123',
@@ -49,6 +50,7 @@ function createGitHubClientMock() {
             pullRequest: {
               state: 'OPEN',
               url: 'https://github.com/openai/gated-review/pull/42',
+              isDraft: false,
               headRepositoryOwner: { login: 'openai' },
               headRefName: 'feature',
               headRefOid: 'head-sha-123',
@@ -130,7 +132,7 @@ function createGitHubClientMock() {
 }
 
 describe('getPrStatus', () => {
-  it('reads PR state, open-thread counts, merge-ready labels, and check state from GitHub', async () => {
+  it('reads PR state, draft state, open-thread counts, merge-ready labels, and check state from GitHub', async () => {
     const { github, request, rest } = createGitHubClientMock();
 
     const result = await getPrStatus(
@@ -158,6 +160,7 @@ describe('getPrStatus', () => {
         pullRequestNumber: 42,
         state: 'OPEN',
         url: 'https://github.com/openai/gated-review/pull/42',
+        isDraft: true,
         headOwner: 'openai',
         headBranch: 'feature',
         headSha: 'head-sha-123',
@@ -192,6 +195,7 @@ describe('getPrStatus', () => {
             pullRequest: {
               state: 'OPEN',
               url: 'https://github.com/openai/gated-review/pull/42',
+              isDraft: false,
               headRepositoryOwner: { login: 'openai' },
               headRefName: 'feature',
               headRefOid: 'head-sha-123',
@@ -271,6 +275,7 @@ describe('getPrStatus', () => {
               pullRequest: {
                 state: prState,
                 url: 'https://github.com/openai/gated-review/pull/42',
+                isDraft: false,
                 headRepositoryOwner: { login: 'openai' },
                 headRefName: 'feature',
                 headRefOid: 'head-sha-123',

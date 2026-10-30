@@ -91,6 +91,7 @@ export type GraphQLPrStatusQueryData = Readonly<{
     pullRequest: Readonly<{
       state: GraphQLPrState;
       url: string;
+      isDraft: boolean;
       headRepositoryOwner: Readonly<{ login: string }> | null;
       headRefName: string;
       headRefOid: string;
@@ -186,6 +187,7 @@ export const prStatusQuery = `
       pullRequest(number: $number) {
         state
         url
+        isDraft
         headRepositoryOwner { login }
         headRefName
         headRefOid
