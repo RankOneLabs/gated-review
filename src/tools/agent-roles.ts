@@ -88,15 +88,16 @@ export function surfaceLabel(surface: McpSurface): string {
 }
 
 function applyGrant(tool: RegisteredTool, grant: RoleGrant, role: AgentRole): RegisteredTool {
+  const described: RegisteredTool =
+    grant.descriptionNote === undefined ? tool : { ...tool, description: `${tool.description} ${grant.descriptionNote}` };
   if (grant.policy === undefined) {
-    return tool;
+    return described;
   }
   // The server has already parsed the input with this tool's own schema, which is the
   // input type the grant's policy was written for.
   const policy = grant.policy as (input: unknown, role: AgentRole) => Result<unknown, ToolDomainError>;
   return {
-    ...tool,
-    description: grant.descriptionNote === undefined ? tool.description : `${tool.description} ${grant.descriptionNote}`,
+    ...described,
     handler: async (input) => {
       const allowed = policy(input, role);
       if (!allowed.ok) {

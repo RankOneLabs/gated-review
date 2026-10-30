@@ -139,6 +139,12 @@ describe('assessor surface', () => {
     }
   });
 
+  it('tells the assessor when to mark ready and when to re-draft', () => {
+    const description = surfaceTool(assessor, 'set_pr_draft', createContext().context).description;
+
+    expect(description).toContain('ready for review on a passing assessment and back to draft on a failing one');
+  });
+
   it('marks a pull request ready for review', async () => {
     const { context } = createContext();
 
