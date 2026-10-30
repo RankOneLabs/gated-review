@@ -77,6 +77,31 @@ describe('set_pr_draft', () => {
     expect(operationNames(request)).toEqual(['PullRequestDraftState', 'ConvertPullRequestToDraft']);
   });
 
+  it('logs a change of draft state, and nothing when the state already matches', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      await createSetPrDraftHandler(createContext(true).context)({
+        repository: 'openai/gated-review',
+        pullRequestNumber: 42,
+        draft: false
+      });
+      await createSetPrDraftHandler(createContext(false).context)({
+        repository: 'openai/gated-review',
+        pullRequestNumber: 42,
+        draft: false
+      });
+
+      expect(info.mock.calls.filter(([message]) => message === '[gated-review] pr draft changed')).toEqual([
+        [
+          '[gated-review] pr draft changed',
+          { repository: 'openai/gated-review', pullRequestNumber: 42, from: 'draft', to: 'ready' }
+        ]
+      ]);
+    } finally {
+      info.mockRestore();
+    }
+  });
+
   it('makes no mutation when the pull request is already in the requested state', async () => {
     const { context, request } = createContext(false);
 

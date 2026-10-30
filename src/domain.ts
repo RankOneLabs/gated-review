@@ -4,6 +4,8 @@ export type ReviewId = Brand<'ReviewId'>;
 export type ActionId = Brand<'ActionId'>;
 export type EventId = Brand<'EventId'>;
 export type DecisionId = Brand<'DecisionId'>;
+/** A pull request's GraphQL node id, which the draft mutations take in place of its number. */
+export type PullRequestNodeId = Brand<'PullRequestNodeId'>;
 
 export type ToolEntity =
   | { kind: 'tool'; name: string }

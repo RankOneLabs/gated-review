@@ -2,6 +2,7 @@ import type { GitHubGraphQLClient } from '#root/src/github/graphql.js';
 import type { GitHubRepositoryScope } from '#root/src/github/rest.js';
 import type { GitHubError } from '#root/src/github/errors.js';
 import type { Result } from '#root/src/result.js';
+import type { PullRequestNodeId } from '#root/src/domain.js';
 
 export type AddPullRequestReviewThreadReplyInput = Readonly<{
   threadId: string;
@@ -130,7 +131,7 @@ export type PullRequestDraftStateInput = Readonly<{
 }>;
 
 export type PullRequestDraftState = Readonly<{
-  id: string;
+  id: PullRequestNodeId;
   number: number;
   url: string;
   isDraft: boolean;
@@ -143,7 +144,7 @@ export type PullRequestDraftStateResponse = Readonly<{
 }>;
 
 export type PullRequestDraftMutationInput = Readonly<{
-  pullRequestId: string;
+  pullRequestId: PullRequestNodeId;
   repository?: GitHubRepositoryScope;
 }>;
 

@@ -73,18 +73,21 @@ export function createSetPrDraftHandler(context: ToolExecutionContext) {
       repository: { owner: repoRef.value.owner, repo: repoRef.value.repo }
     };
 
-    if (parsedInput.draft) {
-      const converted = await convertPullRequestToDraft(context.github.graphql, mutationInput);
-      if (!converted.ok) {
-        return err(mapGitHubError(operationName, converted.error));
-      }
-      return ok({ ...converted.value.convertPullRequestToDraft.pullRequest });
+    const changed = parsedInput.draft
+      ? await convertPullRequestToDraft(context.github.graphql, mutationInput)
+      : await markPullRequestReadyForReview(context.github.graphql, mutationInput);
+    if (!changed.ok) {
+      return err(mapGitHubError(operationName, changed.error));
     }
-
-    const marked = await markPullRequestReadyForReview(context.github.graphql, mutationInput);
-    if (!marked.ok) {
-      return err(mapGitHubError(operationName, marked.error));
-    }
-    return ok({ ...marked.value.markPullRequestReadyForReview.pullRequest });
+    const updated = 'convertPullRequestToDraft' in changed.value
+      ? changed.value.convertPullRequestToDraft.pullRequest
+      : changed.value.markPullRequestReadyForReview.pullRequest;
+    console.info('[gated-review] pr draft changed', {
+      repository: parsedInput.repository,
+      pullRequestNumber: pullRequest.number,
+      from: pullRequest.isDraft ? 'draft' : 'ready',
+      to: updated.isDraft ? 'draft' : 'ready'
+    });
+    return ok({ number: updated.number, url: updated.url, isDraft: updated.isDraft });
   };
 }
