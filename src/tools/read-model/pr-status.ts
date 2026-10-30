@@ -160,6 +160,7 @@ export async function getPrStatus(
     pullRequestNumber: parsedInput.pullRequestNumber,
     state: openThreads.value.pullRequest.state,
     url: openThreads.value.pullRequest.url,
+    isDraft: openThreads.value.pullRequest.isDraft,
     headOwner: openThreads.value.pullRequest.headRepositoryOwner?.login ?? null,
     headBranch: openThreads.value.pullRequest.headRefName,
     headSha: openThreads.value.pullRequest.headRefOid,

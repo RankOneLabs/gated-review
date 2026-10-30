@@ -305,6 +305,7 @@ export const prStatusOutputSchema = z
     pullRequestNumber: z.number().int().positive(),
     state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
     url: z.url(),
+    isDraft: z.boolean(),
     headOwner: z.string().min(1).nullable(),
     headBranch: z.string().min(1),
     headSha: z.string().min(1),

@@ -12,6 +12,10 @@ The server speaks **Streamable HTTP MCP** (spec §4). Every MCP interaction goes
 http://willie:3555/mcp
 ```
 
+Role-scoped sessions use `/mcp/builder` or `/mcp/assessor` on the same port (see
+[agent workflow](agent-workflow.md#role-scoped-endpoints)); a session is served only on
+the path it was opened on. Any other path returns 404.
+
 Clients POST to `/mcp` without a session header to initialize a new session; the server
 responds with an `mcp-session-id` header. All subsequent requests for that session must
 include the header — the server returns `404 Session not found` when the header is

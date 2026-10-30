@@ -1,15 +1,13 @@
 import { createServer as createHttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createServer } from '#root/src/server.js';
+import { createMcpRequestHandler, type McpSession } from '#root/src/server.js';
 import { createToolExecutionContext } from '#root/src/tools/context.js';
 import { createGitHubGraphQLClient } from '#root/src/github/graphql.js';
 import { createGitHubRestClient } from '#root/src/github/rest.js';
 import { ok } from '#root/src/result.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { randomUUID } from 'node:crypto';
 
 function createStubContext() {
   const tokenProvider: GitHubInstallationTokenProvider = {
@@ -52,38 +50,8 @@ function createStubContext() {
   );
 }
 
-function buildHttpServer(sessions: Map<string, StreamableHTTPServerTransport>) {
-  const context = createStubContext();
-
-  return createHttpServer(async (req, res) => {
-    try {
-      const sessionId = req.headers['mcp-session-id'];
-
-      if (typeof sessionId === 'string' && sessions.has(sessionId)) {
-        await sessions.get(sessionId)!.handleRequest(req, res);
-        return;
-      }
-
-      const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (id) => {
-          sessions.set(id, transport);
-        },
-        onsessionclosed: (id) => {
-          sessions.delete(id);
-        }
-      });
-
-      const server = createServer(context);
-      await server.connect(transport);
-      await transport.handleRequest(req, res);
-    } catch {
-      if (!res.headersSent) {
-        res.writeHead(500);
-        res.end();
-      }
-    }
-  });
+function buildHttpServer(sessions: Map<string, McpSession>) {
+  return createHttpServer(createMcpRequestHandler(createStubContext(), sessions));
 }
 
 const initBody = JSON.stringify({
@@ -128,7 +96,7 @@ function parseSseMessage(body: string): unknown {
 
 describe('HTTP MCP server startup', () => {
   it('binds to a port and handles an MCP initialize request', async () => {
-    const sessions = new Map<string, StreamableHTTPServerTransport>();
+    const sessions = new Map<string, McpSession>();
     const httpServer = buildHttpServer(sessions);
 
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
@@ -154,7 +122,7 @@ describe('HTTP MCP server startup', () => {
   });
 
   it('serves two concurrent sessions independently', async () => {
-    const sessions = new Map<string, StreamableHTTPServerTransport>();
+    const sessions = new Map<string, McpSession>();
     const httpServer = buildHttpServer(sessions);
 
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
@@ -198,7 +166,7 @@ describe('HTTP MCP server startup', () => {
   // "Transforms cannot be represented in JSON Schema", leaving clients unable to
   // discover any tool even though `initialize` succeeded.
   it('answers tools/list with serializable schemas for every tool', async () => {
-    const sessions = new Map<string, StreamableHTTPServerTransport>();
+    const sessions = new Map<string, McpSession>();
     const httpServer = buildHttpServer(sessions);
 
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
@@ -241,5 +209,123 @@ describe('HTTP MCP server startup', () => {
         httpServer.close((err) => (err ? reject(err) : resolve()))
       );
     }
+  });
+
+  describe('role-scoped endpoints', () => {
+    async function withServer(run: (baseUrl: string) => Promise<void>) {
+      const httpServer = buildHttpServer(new Map<string, McpSession>());
+      await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+      const { port } = httpServer.address() as AddressInfo;
+      try {
+        await run(`http://127.0.0.1:${port}`);
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          httpServer.close((err) => (err ? reject(err) : resolve()))
+        );
+      }
+    }
+
+    async function openSession(url: string) {
+      const initResponse = await fetch(url, { method: 'POST', headers: MCP_HEADERS, body: initBody });
+      expect(initResponse.status).toBe(200);
+      const sessionId = initResponse.headers.get('mcp-session-id') as string;
+      await initResponse.body?.cancel();
+      const headers = { ...MCP_HEADERS, 'mcp-session-id': sessionId };
+      const initialized = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
+      });
+      await initialized.body?.cancel();
+      return headers;
+    }
+
+    async function rpc(url: string, headers: Record<string, string>, method: string, params?: unknown) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method, params })
+      });
+      return parseSseMessage(await response.text()) as {
+        result?: { tools?: Array<{ name: string }>; isError?: boolean; content?: Array<{ text: string }> };
+      };
+    }
+
+    async function listedToolNames(url: string) {
+      const headers = await openSession(url);
+      const message = await rpc(url, headers, 'tools/list');
+      return message.result?.tools?.map((tool) => tool.name) ?? [];
+    }
+
+    it('lists the builder tools on /mcp/builder', async () => {
+      await withServer(async (baseUrl) => {
+        const names = await listedToolNames(`${baseUrl}/mcp/builder`);
+        expect(names).toContain('open_pr');
+        expect(names).not.toContain('set_pr_draft');
+      });
+    });
+
+    it('lists the assessor tools on /mcp/assessor', async () => {
+      await withServer(async (baseUrl) => {
+        const names = await listedToolNames(`${baseUrl}/mcp/assessor`);
+        expect(names).toContain('set_pr_draft');
+        expect(names).not.toContain('open_pr');
+        expect(names).not.toContain('git.push');
+      });
+    });
+
+    it('keeps set_pr_draft off the unscoped /mcp surface', async () => {
+      await withServer(async (baseUrl) => {
+        const names = await listedToolNames(`${baseUrl}/mcp`);
+        expect(names).toContain('open_pr');
+        expect(names).not.toContain('set_pr_draft');
+      });
+    });
+
+    it('returns 404 for an unknown role', async () => {
+      await withServer(async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/mcp/operator`, { method: 'POST', headers: MCP_HEADERS, body: initBody });
+        expect(response.status).toBe(404);
+        await response.body?.cancel();
+      });
+    });
+
+    it('does not serve a session on a different surface than it was opened on', async () => {
+      await withServer(async (baseUrl) => {
+        const headers = await openSession(`${baseUrl}/mcp/assessor`);
+        const response = await fetch(`${baseUrl}/mcp/builder`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
+        });
+        expect(response.status).toBe(404);
+        await response.body?.cancel();
+      });
+    });
+
+    it('logs an assessor attempt to convert a pull request to draft as a tool rejection', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await withServer(async (baseUrl) => {
+          const url = `${baseUrl}/mcp/assessor`;
+          const headers = await openSession(url);
+          const message = await rpc(url, headers, 'tools/call', {
+            name: 'set_pr_draft',
+            arguments: { repository: 'openai/gated-review', pullRequestNumber: 42, draft: true }
+          });
+
+          expect(message.result?.isError).toBe(true);
+          expect(warn).toHaveBeenCalledWith(
+            '[gated-review] tool rejection',
+            expect.objectContaining({
+              operation: 'set_pr_draft',
+              detail: expect.stringContaining('role=assessor')
+            })
+          );
+        });
+      } finally {
+        warn.mockRestore();
+      }
+    });
   });
 });

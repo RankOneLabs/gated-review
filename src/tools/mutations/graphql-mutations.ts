@@ -122,3 +122,117 @@ export function resolveReviewThread(
     repository: input.repository
   });
 }
+
+export type PullRequestDraftStateInput = Readonly<{
+  owner: string;
+  repo: string;
+  number: number;
+}>;
+
+export type PullRequestDraftState = Readonly<{
+  id: string;
+  number: number;
+  url: string;
+  isDraft: boolean;
+}>;
+
+export type PullRequestDraftStateResponse = Readonly<{
+  repository: Readonly<{
+    pullRequest: PullRequestDraftState | null;
+  }> | null;
+}>;
+
+export type PullRequestDraftMutationInput = Readonly<{
+  pullRequestId: string;
+  repository?: GitHubRepositoryScope;
+}>;
+
+export type MarkPullRequestReadyForReviewResponse = Readonly<{
+  markPullRequestReadyForReview: Readonly<{
+    pullRequest: Omit<PullRequestDraftState, 'id'>;
+  }>;
+}>;
+
+export type ConvertPullRequestToDraftResponse = Readonly<{
+  convertPullRequestToDraft: Readonly<{
+    pullRequest: Omit<PullRequestDraftState, 'id'>;
+  }>;
+}>;
+
+export function fetchPullRequestDraftState(
+  client: GitHubGraphQLClient,
+  input: PullRequestDraftStateInput
+): Promise<Result<PullRequestDraftStateResponse, GitHubError>> {
+  return client.request<PullRequestDraftStateResponse>({
+    operationName: 'PullRequestDraftState',
+    requestLabel: 'POST /graphql',
+    query: `
+      query PullRequestDraftState($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $number) {
+            id
+            number
+            url
+            isDraft
+          }
+        }
+      }
+    `,
+    variables: {
+      owner: input.owner,
+      repo: input.repo,
+      number: input.number
+    },
+    repository: { owner: input.owner, repo: input.repo }
+  });
+}
+
+export function markPullRequestReadyForReview(
+  client: GitHubGraphQLClient,
+  input: PullRequestDraftMutationInput
+): Promise<Result<MarkPullRequestReadyForReviewResponse, GitHubError>> {
+  return client.request<MarkPullRequestReadyForReviewResponse>({
+    operationName: 'MarkPullRequestReadyForReview',
+    requestLabel: 'POST /graphql',
+    query: `
+      mutation MarkPullRequestReadyForReview($pullRequestId: ID!) {
+        markPullRequestReadyForReview(input: { pullRequestId: $pullRequestId }) {
+          pullRequest {
+            number
+            url
+            isDraft
+          }
+        }
+      }
+    `,
+    variables: {
+      pullRequestId: input.pullRequestId
+    },
+    repository: input.repository
+  });
+}
+
+export function convertPullRequestToDraft(
+  client: GitHubGraphQLClient,
+  input: PullRequestDraftMutationInput
+): Promise<Result<ConvertPullRequestToDraftResponse, GitHubError>> {
+  return client.request<ConvertPullRequestToDraftResponse>({
+    operationName: 'ConvertPullRequestToDraft',
+    requestLabel: 'POST /graphql',
+    query: `
+      mutation ConvertPullRequestToDraft($pullRequestId: ID!) {
+        convertPullRequestToDraft(input: { pullRequestId: $pullRequestId }) {
+          pullRequest {
+            number
+            url
+            isDraft
+          }
+        }
+      }
+    `,
+    variables: {
+      pullRequestId: input.pullRequestId
+    },
+    repository: input.repository
+  });
+}
