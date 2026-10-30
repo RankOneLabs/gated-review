@@ -41,12 +41,12 @@ fixes the session's tools for its lifetime:
 | tool | `/mcp/builder` | `/mcp/assessor` | `/mcp` |
 |---|---|---|---|
 | `open_pr` | always opens a draft; `draft: false` is rejected | absent | as given |
-| `set_pr_draft` | absent | `draft: false` only; `draft: true` is rejected | absent |
+| `set_pr_draft` | absent | present: ready on a passing assessment, draft on a failing one | absent |
 | `git.push`, `git.pull`, `reply_to_thread`, `resolve_thread`, `request_next_round` | present | absent | present |
 | `git.fetch`, `get_review_round`, `pr_status`, `review.*` | present | present | present |
 
-So a builder can only open draft pull requests, and only an assessor can mark
-one ready for review. A rejected call is logged as `[gated-review] tool
+So a builder can only open draft pull requests, and only an assessor can change
+a pull request's draft state, so it follows the latest assessment. A rejected call is logged as `[gated-review] tool
 rejection` with the role, tool and repository in its detail.
 
 The role is chosen by the endpoint the orchestrator configures, which the agent

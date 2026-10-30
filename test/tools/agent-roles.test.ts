@@ -7,15 +7,16 @@ import { createToolRegistry } from '#root/src/tools/registry.js';
 
 const pullRequestUrl = 'https://github.com/openai/gated-review/pull/42';
 
-function createContext() {
+function createContext(isDraft = true) {
   const createPullRequest = vi.fn(async (_repository: unknown, _request: unknown) =>
     ok({ number: 42, html_url: pullRequestUrl, state: 'open' })
   );
   const graphqlRequest = vi.fn(async (input: { operationName: string }) => {
     if (input.operationName === 'PullRequestDraftState') {
-      return ok({ repository: { pullRequest: { id: 'PR_node_42', number: 42, url: pullRequestUrl, isDraft: true } } });
+      return ok({ repository: { pullRequest: { id: 'PR_node_42', number: 42, url: pullRequestUrl, isDraft } } });
     }
-    return ok({ markPullRequestReadyForReview: { pullRequest: { number: 42, url: pullRequestUrl, isDraft: false } } });
+    const changed = { pullRequest: { number: 42, url: pullRequestUrl, isDraft: !isDraft } };
+    return ok(isDraft ? { markPullRequestReadyForReview: changed } : { convertPullRequestToDraft: changed });
   });
 
   const context = {
@@ -150,8 +151,8 @@ describe('assessor surface', () => {
     expect(result).toEqual({ ok: true, value: { number: 42, url: pullRequestUrl, isDraft: false } });
   });
 
-  it('rejects draft: true without calling GitHub', async () => {
-    const { context, graphqlRequest } = createContext();
+  it('converts a ready pull request back to draft', async () => {
+    const { context } = createContext(false);
 
     const result = await surfaceTool(assessor, 'set_pr_draft', context).handler({
       repository: 'openai/gated-review',
@@ -159,12 +160,6 @@ describe('assessor surface', () => {
       draft: true
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.kind).toBe('validation_rejected');
-      expect(result.error.detail).toContain('role=assessor');
-      expect(result.error.detail).toContain('repository=openai/gated-review');
-    }
-    expect(graphqlRequest).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, value: { number: 42, url: pullRequestUrl, isDraft: true } });
   });
 });

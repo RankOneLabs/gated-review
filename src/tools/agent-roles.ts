@@ -3,7 +3,6 @@ import type { ZodTypeAny } from 'zod';
 import { validationRejectedError, type ToolDomainError } from '#root/src/errors.js';
 import { err, ok, type Result } from '#root/src/result.js';
 import type { OpenPrInput } from '#root/src/tools/mutations/open-pr.js';
-import type { SetPrDraftInput } from '#root/src/tools/mutations/set-pr-draft.js';
 import type { ToolName } from '#root/src/tools/registry.js';
 import type { ToolContract } from '#root/src/tools/types.js';
 
@@ -44,18 +43,6 @@ const builderOpensDrafts: InputPolicy<OpenPrInput> = (input, role) => {
   return ok({ ...input, draft: true });
 };
 
-const assessorMarksReadyOnly: InputPolicy<SetPrDraftInput> = (input, role) => {
-  if (input.draft) {
-    return err(
-      validationRejectedError(
-        'set_pr_draft',
-        `role=${role} may only mark a pull request ready for review (draft: false); repository=${input.repository} pullRequestNumber=${input.pullRequestNumber}`
-      )
-    );
-  }
-  return ok(input);
-};
-
 const roleGrants: Readonly<Record<AgentRole, readonly RoleGrant[]>> = {
   builder: [
     { name: 'review.get_state' },
@@ -79,8 +66,8 @@ const roleGrants: Readonly<Record<AgentRole, readonly RoleGrant[]>> = {
     { name: 'review.list_actions' },
     {
       name: 'set_pr_draft',
-      policy: assessorMarksReadyOnly,
-      descriptionNote: 'Assessor sessions may only mark a pull request ready for review (draft: false).'
+      descriptionNote:
+        'Assessor sessions mark the pull request ready for review on a passing assessment and back to draft on a failing one.'
     },
     { name: 'git.fetch' },
     { name: 'get_review_round' },
