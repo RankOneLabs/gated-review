@@ -303,23 +303,23 @@ describe('HTTP MCP server startup', () => {
       });
     });
 
-    it('logs an assessor attempt to convert a pull request to draft as a tool rejection', async () => {
+    it('logs a builder attempt to open a ready pull request as a tool rejection', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
         await withServer(async (baseUrl) => {
-          const url = `${baseUrl}/mcp/assessor`;
+          const url = `${baseUrl}/mcp/builder`;
           const headers = await openSession(url);
           const message = await rpc(url, headers, 'tools/call', {
-            name: 'set_pr_draft',
-            arguments: { repository: 'openai/gated-review', pullRequestNumber: 42, draft: true }
+            name: 'open_pr',
+            arguments: { repository: 'openai/gated-review', base: 'main', head: 'feature', title: 'Add feature', draft: false }
           });
 
           expect(message.result?.isError).toBe(true);
           expect(warn).toHaveBeenCalledWith(
             '[gated-review] tool rejection',
             expect.objectContaining({
-              operation: 'set_pr_draft',
-              detail: expect.stringContaining('role=assessor')
+              operation: 'open_pr',
+              detail: expect.stringContaining('role=builder')
             })
           );
         });
