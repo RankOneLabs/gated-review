@@ -34,29 +34,6 @@ they are never registered, not merely hidden behind a runtime check:
 The agent must not try to recreate those operations through another GitHub
 surface.
 
-## Role-Scoped Endpoints
-
-`/mcp` serves the agent surface above. An orchestrator that runs agents in
-fixed roles connects each session to a role endpoint instead, and the role
-fixes the session's tools for its lifetime:
-
-| tool | `/mcp/builder` | `/mcp/assessor` | `/mcp` |
-|---|---|---|---|
-| `open_pr` | always opens a draft; `draft: false` is rejected | absent | as given |
-| `set_pr_draft` | absent | present: ready on a passing assessment, draft on a failing one | present |
-| `git.push`, `git.pull`, `reply_to_thread`, `resolve_thread`, `request_next_round` | present | absent | present |
-| `git.fetch`, `get_review_round`, `pr_status`, `review.*` | present | present | present |
-
-Both `/mcp` and `/mcp/assessor` serve `set_pr_draft` to change a pull request's
-draft state. `/mcp/builder` does not serve `set_pr_draft` and only opens draft
-pull requests. The assessor changes draft state to follow the latest assessment.
-A rejected call is logged as `[gated-review] tool
-rejection` with the role, tool and repository in its detail.
-
-The role is chosen by the endpoint the orchestrator configures, which the agent
-cannot edit. It is not authentication: anything on the tailnet can still reach
-`/mcp` directly (see [deferred items](deferred-items.md)).
-
 `set_pr_draft` takes `repository`, `pullRequestNumber` and `draft`, and returns
 `{ number, url, isDraft }`. When the pull request is already in the requested
 state it returns that state without a mutation. `pr_status` reports `isDraft`.
@@ -79,8 +56,11 @@ not, the tool returns an authorization error. See
 2. Commit locally.
 3. Push through `git.push` (with `repository`) so remote credentials stay
    behind the server.
-4. Open the pull request with `open_pr`. On `/mcp/builder` it opens as a
-   draft; an assessor marks it ready with `set_pr_draft`.
+4. Open the pull request with `open_pr`.
+
+Draft handling is a workflow prompt responsibility, not enforced by the server.
+`open_pr` opens ready for review unless the caller passes `draft: true`.
+Use `set_pr_draft` on `/mcp` to change draft state.
 
 Local-only git operations such as staging, committing, branching, merging, and
 rebasing stay in the shell. Remote git operations such as push, pull, and fetch
@@ -126,8 +106,7 @@ how the watermark is produced and its in-memory storage model.
 ### Workflow status and failure logs
 
 Call `get_workflow_status` with `{ repository, pullRequestNumber }` to inspect
-GitHub Actions independently of review comments. It is available on `/mcp`,
-`/mcp/builder`, and `/mcp/assessor` as its own MCP tool.
+GitHub Actions independently of review comments. It is available on `/mcp` as its own MCP tool.
 
 The response includes `headSha`, `mergeSha` (when GitHub has a test merge commit),
 and the latest workflow runs for those commits. Each run includes its URL,
