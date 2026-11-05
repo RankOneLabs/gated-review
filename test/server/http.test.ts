@@ -274,11 +274,11 @@ describe('HTTP MCP server startup', () => {
       });
     });
 
-    it('keeps set_pr_draft off the unscoped /mcp surface', async () => {
+    it('serves set_pr_draft on the unscoped /mcp surface', async () => {
       await withServer(async (baseUrl) => {
         const names = await listedToolNames(`${baseUrl}/mcp`);
         expect(names).toContain('open_pr');
-        expect(names).not.toContain('set_pr_draft');
+        expect(names).toContain('set_pr_draft');
       });
     });
 

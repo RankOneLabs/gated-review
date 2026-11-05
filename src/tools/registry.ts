@@ -127,8 +127,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       title: 'Set Pull Request Draft',
       description:
         'Mark a pull request ready for review (draft: false) or convert it to a draft (draft: true). Succeeds without change when the pull request is already in that state. Requires repository as an owner/name slug.',
-      // Not on the unscoped agent surface: the assessor role gets a narrowed copy (see agent-roles.ts).
-      actorScopes: ['operator'] as const,
+      actorScopes: ['agent', 'operator'] as const,
       inputSchemaName: 'set_pr_draft.input',
       outputSchemaName: 'set_pr_draft.output',
       inputSchema: setPrDraftInputSchema,

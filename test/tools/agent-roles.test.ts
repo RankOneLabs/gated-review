@@ -78,18 +78,17 @@ describe('surfaceForPath', () => {
 });
 
 describe('unscoped agent surface', () => {
-  it('is the agent-scoped registry, without set_pr_draft', () => {
+  it('is the agent-scoped registry', () => {
     const agentScoped = createToolRegistry(createContext().context)
       .filter((tool) => tool.actorScopes.some((scope) => scope === 'agent'))
       .map((tool) => tool.name);
     expect(surfaceToolNames(unscoped)).toEqual(agentScoped);
-    expect(surfaceToolNames(unscoped)).not.toContain('set_pr_draft');
   });
 });
 
 describe('builder surface', () => {
   it('offers the unscoped agent tools and nothing else', () => {
-    expect(surfaceToolNames(builder)).toEqual(surfaceToolNames(unscoped));
+    expect(surfaceToolNames(builder)).toEqual(surfaceToolNames(unscoped).filter((name) => name !== 'set_pr_draft'));
   });
 
   it('has no set_pr_draft', () => {

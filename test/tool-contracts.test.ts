@@ -615,7 +615,7 @@ describe('tool contracts', () => {
       'operator'
     ]);
     expect(toolRegistry.find((tool) => tool.name === 'open_pr')?.actorScopes).toEqual(['agent']);
-    expect(toolRegistry.find((tool) => tool.name === 'set_pr_draft')?.actorScopes).toEqual(['operator']);
+    expect(toolRegistry.find((tool) => tool.name === 'set_pr_draft')?.actorScopes).toEqual(['agent', 'operator']);
     expect(toolRegistry.find((tool) => tool.name === 'reply_to_thread')?.actorScopes).toEqual([
       'agent'
     ]);
