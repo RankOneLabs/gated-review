@@ -7,7 +7,7 @@ The server runs as a long-lived HTTP service (Streamable HTTP MCP transport). Ag
 - Curated MCP tools for read-model inspection, review mutations, git gateway operations, and operator actions.
 - Schema-shaped outputs that are validated at the registry boundary.
 - Actor-scoped tool exposure: operator-only tools are absent from the agent-facing surface by construction, not by a runtime flag.
-- Role-scoped endpoints: `/mcp/builder` opens pull requests only as drafts, and `/mcp/assessor` can only mark them ready for review (see [agent workflow](docs/agent-workflow.md#role-scoped-endpoints)).
+- Role-scoped endpoints: `/mcp` and `/mcp/assessor` both serve `set_pr_draft` to change draft state; `/mcp/builder` does not and opens pull requests only as drafts (see [agent workflow](docs/agent-workflow.md#role-scoped-endpoints)).
 - Per-PR freshness watermarks held in memory for the server lifetime.
 - A separate `get_workflow_status` tool for current PR workflow status and failed-job logs.
 - No `github_raw` passthrough or uncurated GitHub escape hatch.
