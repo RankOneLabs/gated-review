@@ -58,11 +58,11 @@ themselves.
 
 ## Draft Status
 
-Both `/mcp` and `/mcp/assessor` serve `set_pr_draft` to change draft state.
-`/mcp/builder` does not serve `set_pr_draft` and only opens draft pull requests.
-Ready-for-review is the assessor's
-signal that the work passed assessment; it is not MergeReady. `merge_pr` still
-enforces only the `merge-ready` label, which remains the operator's.
+`/mcp` serves `set_pr_draft` to change draft state. Draft handling is a
+workflow prompt responsibility, not enforced by the server. `open_pr` opens
+ready for review unless the caller passes `draft: true`.
+Ready-for-review is not MergeReady. `merge_pr` still enforces only the
+`merge-ready` label, which remains the operator's.
 
 ## Server Boundary
 

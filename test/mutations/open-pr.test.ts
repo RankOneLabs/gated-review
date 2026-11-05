@@ -3,8 +3,32 @@ import { describe, expect, it } from 'vitest';
 import { ok } from '#root/src/result.js';
 import { createGitHubGraphQLClient } from '#root/src/github/graphql.js';
 import { createGitHubRestClient } from '#root/src/github/rest.js';
-import { createOpenPrHandler } from '#root/src/tools/mutations/open-pr.js';
+import { createOpenPrHandler, type OpenPrInput } from '#root/src/tools/mutations/open-pr.js';
 import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache.js';
+
+type OpenPrCase = Readonly<{
+  name: string;
+  draftInput: Pick<OpenPrInput, 'draft'>;
+  expectedBody: Omit<OpenPrInput, 'repository'>;
+}>;
+
+const draftCases: readonly OpenPrCase[] = [
+  {
+    name: 'creates a pull request within the configured repository scope',
+    draftInput: { draft: true },
+    expectedBody: { title: 'Add feature', head: 'feature-branch', base: 'main', body: 'Ship it', draft: true }
+  },
+  {
+    name: 'sends draft: false when explicitly requested',
+    draftInput: { draft: false },
+    expectedBody: { title: 'Add feature', head: 'feature-branch', base: 'main', body: 'Ship it', draft: false }
+  },
+  {
+    name: 'omits the draft key when draft is not supplied',
+    draftInput: {},
+    expectedBody: { title: 'Add feature', head: 'feature-branch', base: 'main', body: 'Ship it' }
+  }
+];
 
 describe('open_pr', () => {
   const tokenProvider: GitHubInstallationTokenProvider = {
@@ -13,7 +37,7 @@ describe('open_pr', () => {
     }
   };
 
-  it('creates a pull request within the configured repository scope', async () => {
+  it.each(draftCases)('$name', async ({ draftInput, expectedBody }) => {
     const requests: Array<{ url: string; body: unknown }> = [];
     const rest = createGitHubRestClient(
       {
@@ -82,7 +106,7 @@ describe('open_pr', () => {
       head: 'feature-branch',
       title: 'Add feature',
       body: 'Ship it',
-      draft: true
+      ...draftInput
     });
 
     expect(result.ok).toBe(true);
@@ -96,13 +120,7 @@ describe('open_pr', () => {
     expect(requests).toEqual([
       {
         url: 'https://api.github.com/repos/openai/gated-review/pulls',
-        body: {
-          title: 'Add feature',
-          head: 'feature-branch',
-          base: 'main',
-          body: 'Ship it',
-          draft: true
-        }
+        body: expectedBody
       }
     ]);
   });
