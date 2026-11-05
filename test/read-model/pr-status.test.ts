@@ -4,6 +4,7 @@ import { createGitHubError } from '#root/src/github/errors.js';
 import { err, ok } from '#root/src/result.js';
 import type { GitHubClient } from '#root/src/github/client.js';
 import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
+import { prStatusOutputSchema } from '#root/src/tools/schemas.js';
 import {
   prStatusLabelsQuery,
   prStatusQuery
@@ -132,6 +133,24 @@ function createGitHubClientMock() {
 }
 
 describe('getPrStatus', () => {
+  it('returns exactly the 12 documented output keys in both the schema and handler result', async () => {
+    const expectedKeys = [
+      'pullRequestNumber', 'state', 'url', 'isDraft', 'headOwner', 'headBranch',
+      'headSha', 'baseBranch', 'mergedAt', 'openThreadCount', 'mergeReady', 'checks'
+    ];
+    const { github } = createGitHubClientMock();
+    const result = await getPrStatus(
+      { repository: 'openai/gated-review', pullRequestNumber: 42 },
+      { github, copilotReviewerLogin: 'github-copilot[bot]' }
+    );
+
+    expect(Object.keys(prStatusOutputSchema.shape)).toEqual(expectedKeys);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(Object.keys(result.value)).toEqual(expectedKeys);
+    }
+  });
+
   it('reads PR state, draft state, open-thread counts, merge-ready labels, and check state from GitHub', async () => {
     const { github, request, rest } = createGitHubClientMock();
 
