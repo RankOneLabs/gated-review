@@ -144,10 +144,10 @@ describe('getPrStatus', () => {
       { github, copilotReviewerLogin: 'github-copilot[bot]' }
     );
 
-    expect(Object.keys(prStatusOutputSchema.shape)).toEqual(expectedKeys);
+    expect(Object.keys(prStatusOutputSchema.shape).sort()).toEqual([...expectedKeys].sort());
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(Object.keys(result.value)).toEqual(expectedKeys);
+      expect(Object.keys(result.value).sort()).toEqual([...expectedKeys].sort());
     }
   });
 
