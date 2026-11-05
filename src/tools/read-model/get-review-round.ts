@@ -61,16 +61,12 @@ function isPresent(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
 
-function toThreadComment(comment: GraphQLReviewCommentNode): ReadModelThreadComment | null {
-  if (!comment.author || !isPresent(comment.author.login)) {
-    return null;
-  }
-
+function toThreadComment(comment: GraphQLReviewCommentNode): ReadModelThreadComment {
   return {
     id: comment.id,
     body: comment.body,
     createdAt: comment.createdAt,
-    author: tagEntity(comment.author.login)
+    author: comment.author && isPresent(comment.author.login) ? tagEntity(comment.author.login) : null
   };
 }
 
@@ -215,12 +211,7 @@ async function loadThreadComments(
       return err(githubRequestFailedError(operationName, `Review thread ${threadId} was not found.`));
     }
 
-    for (const comment of thread.comments.nodes) {
-      const normalized = toThreadComment(comment);
-      if (normalized) {
-        comments.push(normalized);
-      }
-    }
+    comments.push(...thread.comments.nodes.map(toThreadComment));
 
     if (!thread.comments.pageInfo.hasNextPage) {
       break;
@@ -297,23 +288,14 @@ function validFreshSince(timestamp: string | null): string | null {
 }
 
 function isThreadFresh(comments: ReadModelThreadComment[], priorMs: number | null): boolean {
-  if (priorMs === null) return true;
   return comments.some((comment) => {
     const commentMs = Date.parse(comment.createdAt);
-    return Number.isNaN(commentMs) || commentMs > priorMs;
+    return priorMs === null || Number.isNaN(commentMs) || commentMs > priorMs;
   });
 }
 
-function unseenThreadComments(
-  comments: ReadModelThreadComment[],
-  priorMs: number | null
-): ReadModelThreadComment[] {
-  if (priorMs === null) return comments;
-
-  return comments.filter((comment) => {
-    const commentMs = Date.parse(comment.createdAt);
-    return Number.isNaN(commentMs) || commentMs > priorMs;
-  });
+function countThreadComments(comments: ReadonlyArray<ReadonlyArray<ReadModelThreadComment>>): number {
+  return comments.reduce((count, threadComments) => count + threadComments.length, 0);
 }
 
 export async function getReviewRound(
@@ -427,26 +409,32 @@ export async function getReviewRound(
     context.freshness.purge(key);
   }
 
+  console.info('[gated-review] review round fetched', {
+    operation: operationName,
+    repository: parsedInput.repository,
+    pullRequestNumber: parsedInput.pullRequestNumber,
+    includeResolved: parsedInput.includeResolved ?? false,
+    openThreadCount,
+    returnedThreadCount: threads.length,
+    returnedCommentCount: countThreadComments(comments.value),
+    freshSince
+  });
+
   return ok({
     pullRequestNumber: parsedInput.pullRequestNumber,
     includeResolved: parsedInput.includeResolved ?? false,
     openThreadCount,
     freshSince,
     triagePrompt,
-    threads: threads.flatMap((thread, index) => {
+    threads: threads.map((thread, index) => {
       const threadComments = comments.value[index];
-      const visibleComments = unseenThreadComments(threadComments, priorMs);
-      if (visibleComments.length === 0) {
-        return [];
-      }
-
       const hasFreshComments =
-        thread.state === 'resolved' ? false : isThreadFresh(visibleComments, priorMs);
-      return [{
+        thread.state === 'resolved' ? false : isThreadFresh(threadComments, priorMs);
+      return {
         ...thread,
         hasFreshComments,
-        comments: visibleComments
-      }];
+        comments: threadComments
+      };
     }),
     summaries: summaries.value
   });

@@ -59,7 +59,8 @@ const roleGrants: Readonly<Record<AgentRole, readonly RoleGrant[]>> = {
     { name: 'git.pull' },
     { name: 'git.fetch' },
     { name: 'get_review_round' },
-    { name: 'pr_status' }
+    { name: 'pr_status' },
+    { name: 'get_workflow_status' }
   ],
   assessor: [
     { name: 'review.get_state' },
@@ -71,7 +72,8 @@ const roleGrants: Readonly<Record<AgentRole, readonly RoleGrant[]>> = {
     },
     { name: 'git.fetch' },
     { name: 'get_review_round' },
-    { name: 'pr_status' }
+    { name: 'pr_status' },
+    { name: 'get_workflow_status' }
   ]
 };
 

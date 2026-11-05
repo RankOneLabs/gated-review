@@ -102,22 +102,46 @@ review-thread mutations.
 
 - **`hasFreshComments`** on each thread: true when the thread has comments
   newer than the `lastDelivered` watermark recorded by the server after the
-  previous call. Stale threads are omitted from `threads`; stale comments are
-  omitted from each returned thread's `comments` array.
+  previous call. This is an annotation only: all open threads and their complete
+  comment history are returned on every call. `includeResolved: true` also
+  returns resolved threads and their comment history.
 - **`freshSince`**: the watermark timestamp that was in effect when this call
   was made. Null on the first call for a PR.
 
-The resolve discipline is the mechanism that keeps the watermark meaningful:
+The resolve discipline is the mechanism that keeps the open-thread inbox meaningful:
 **the agent must call `resolve_thread` when a thread is actually addressed**.
-If the agent resolves threads promptly after each approved outcome, the
-watermark accurately separates already-handled threads from newly arrived ones
-on the next round. If the agent skips resolution, all threads continue to
-count as unresolved, but only unseen comments are returned.
+Fetching a thread does not acknowledge or handle it. Until resolved, it continues
+to appear in both `threads` and `openThreadCount`, even if it has no fresh comments.
+Fresh markers are advisory and shared across clients; inspect all open threads.
 
 See [docs/freshness-model.md](freshness-model.md) for a full explanation of
 how the watermark is produced and its in-memory storage model.
 
 ## Applying Approved Outcomes
+
+### Workflow status and failure logs
+
+Call `get_workflow_status` with `{ repository, pullRequestNumber }` to inspect
+GitHub Actions independently of review comments. It is available on `/mcp`,
+`/mcp/builder`, and `/mcp/assessor` as its own MCP tool.
+
+The response includes `headSha`, `mergeSha` (when GitHub has a test merge commit),
+and the latest workflow runs for those commits. Each run includes its URL,
+status, conclusion, attempt, and failed jobs. Independent workflow events and
+branches remain separate; an older failed run does not replace a newer result.
+
+Failed jobs include log text in `logs: { kind: "available", text, truncated }`.
+The server retains the last 20,000 characters per job and downloads logs for up
+to 10 jobs per response. `truncated: true` marks a shortened log. Excess jobs,
+expired logs, and download failures return `kind: "unavailable"` with a detail
+and retain the job URL. If a job list cannot be read, that run's `failedJobs`
+reports `kind: "unavailable"` while preserving the workflow status.
+
+The response's top-level `truncated` flag reports GitHub's 1,000-run search limit.
+An empty `runs` list means no runs were found for the current commits; it does
+not assert that CI passed. The GitHub App requires `Actions: read`.
+
+### Approved review changes
 
 After the operator approves triage:
 

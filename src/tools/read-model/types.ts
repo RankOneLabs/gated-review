@@ -13,7 +13,7 @@ export type ReadModelThreadComment = Readonly<{
   id: string;
   body: string;
   createdAt: string;
-  author: ReadModelEntity;
+  author: ReadModelEntity | null;
 }>;
 
 export type ReadModelReviewThread = Readonly<{

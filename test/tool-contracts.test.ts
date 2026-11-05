@@ -27,7 +27,8 @@ import {
   prStatusQuery,
   reviewRoundSummariesQuery,
   reviewRoundThreadsQuery,
-  reviewThreadCommentsQuery
+  reviewThreadCommentsQuery,
+  workflowTargetQuery
 } from '#root/src/tools/read-model/graphql-queries.js';
 import { createGitHubGraphQLClient } from '#root/src/github/graphql.js';
 import { createGitHubRestClient } from '#root/src/github/rest.js';
@@ -101,6 +102,10 @@ const inputFixtures: Readonly<Record<string, unknown>> = {
   pr_status: {
     repository: 'openai/gated-review',
     pullRequestNumber: 42
+  },
+  get_workflow_status: {
+    repository: 'openai/gated-review',
+    pullRequestNumber: 42
   }
 };
 
@@ -120,6 +125,11 @@ function createMockContext(): ToolExecutionContext {
     {
       fetch: async (input, init) => {
         const url = String(input);
+        if (url.includes('/actions/runs?')) {
+          return new Response(JSON.stringify({ total_count: 0, workflow_runs: [] }), {
+            status: 200, headers: { 'Content-Type': 'application/json' }
+          });
+        }
         if (url.endsWith('/pulls')) {
           return new Response(
             JSON.stringify({
@@ -351,6 +361,12 @@ function createMockContext(): ToolExecutionContext {
           );
         }
 
+        if (request.query === workflowTargetQuery) {
+          return new Response(JSON.stringify({ data: { repository: { pullRequest: {
+            headRefOid: 'head-sha-123', potentialMergeCommit: null
+          } } } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
         if (request.query === reviewRoundThreadsQuery) {
           return new Response(
             JSON.stringify({
@@ -577,7 +593,8 @@ describe('tool contracts', () => {
       'git.pull',
       'git.fetch',
       'get_review_round',
-      'pr_status'
+      'pr_status',
+      'get_workflow_status'
     ]);
     expect(createToolRegistry(createMockContext()).map((tool) => tool.name)).not.toContain('github_raw');
   });
@@ -636,6 +653,9 @@ describe('tool contracts', () => {
       'operator',
       'event_source'
     ]);
+    expect(toolRegistry.find((tool) => tool.name === 'get_workflow_status')?.actorScopes).toEqual([
+      'agent', 'operator', 'event_source'
+    ]);
   });
 
   it('keeps the shaped output schema names explicit', () => {
@@ -656,7 +676,8 @@ describe('tool contracts', () => {
       'git.pull.output',
       'git.fetch.output',
       'get_review_round.output',
-      'pr_status.output'
+      'pr_status.output',
+      'get_workflow_status.output'
     ]);
   });
 
@@ -1003,6 +1024,10 @@ describe('tool contracts', () => {
             }
           }
         });
+      } else if (tool.name === 'get_workflow_status') {
+        expect(result).toEqual({ ok: true, value: {
+          pullRequestNumber: 42, headSha: 'head-sha-123', mergeSha: null, runs: [], truncated: false
+        } });
       } else if (tool.name === 'request_copilot_review') {
         expect(result).toEqual({ ok: true, value: { ok: true } });
       } else if (tool.name === 'mark_merge_ready') {

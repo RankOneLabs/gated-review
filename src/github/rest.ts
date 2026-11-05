@@ -4,6 +4,13 @@ import type { GitHubInstallationTokenProvider } from '#root/src/auth/token-cache
 import type { GitHubFetch } from '#root/src/github/fetch.js';
 import { readGitHubErrorMessage } from '#root/src/github/response-error.js';
 import { resolveGitHubUrl } from '#root/src/github/url.js';
+import type {
+  GitHubWorkflowJobLog,
+  GitHubWorkflowJobsResponse,
+  GitHubWorkflowRunsResponse,
+  WorkflowJobId,
+  WorkflowRunId
+} from '#root/src/github/workflows.js';
 
 export type GitHubRestMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
@@ -20,6 +27,26 @@ export type GitHubRestRequest<TResponse> = Readonly<{
   body?: unknown;
   /** Repository whose owner selects the App installation; falls back to the fixed id when absent. */
   repository?: GitHubRepositoryScope;
+  signal?: AbortSignal;
+}>;
+
+export type GitHubWorkflowRunsRequest = Readonly<{
+  repository: GitHubRepositoryScope;
+  headSha: string;
+  page: number;
+}>;
+
+export type GitHubWorkflowJobsRequest = Readonly<{
+  repository: GitHubRepositoryScope;
+  runId: WorkflowRunId;
+  attempt: number;
+  page: number;
+}>;
+
+export type GitHubWorkflowJobLogRequest = Readonly<{
+  repository: GitHubRepositoryScope;
+  jobId: WorkflowJobId;
+  maxCharacters: number;
 }>;
 
 export type InstallationIdResolver = (
@@ -112,7 +139,10 @@ export function createGitHubRestClient(
     );
   }
 
-  async function request<TResponse>(input: GitHubRestRequest<TResponse>): Promise<Result<TResponse, GitHubError>> {
+  async function requestResponse(
+    input: GitHubRestRequest<unknown>,
+    redirect: RequestInit['redirect'] = 'follow'
+  ): Promise<Result<Response, GitHubError>> {
     const installationId = await resolveInstallationId(input.repository);
     if (!installationId.ok) {
       return err(installationId.error);
@@ -127,6 +157,8 @@ export function createGitHubRestClient(
     try {
       response = await fetchFn(buildUrl(options.baseUrl, input.path), {
         method: input.method,
+        redirect,
+        signal: input.signal,
         headers: {
           Accept: 'application/vnd.github+json',
           Authorization: `Bearer ${token.value}`,
@@ -147,7 +179,7 @@ export function createGitHubRestClient(
       );
     }
 
-    if (!response.ok) {
+    if (!response.ok && !(redirect === 'manual' && response.status === 302)) {
       return err(
         createGitHubError({
           category: 'rest',
@@ -158,6 +190,14 @@ export function createGitHubRestClient(
         })
       );
     }
+
+    return ok(response);
+  }
+
+  async function request<TResponse>(input: GitHubRestRequest<TResponse>): Promise<Result<TResponse, GitHubError>> {
+    const result = await requestResponse(input);
+    if (!result.ok) return result;
+    const response = result.value;
 
     if (response.status === 204) {
       return ok(undefined as TResponse);
@@ -180,8 +220,94 @@ export function createGitHubRestClient(
     }
   }
 
+  async function getWorkflowJobLogs(input: GitHubWorkflowJobLogRequest): Promise<Result<GitHubWorkflowJobLog, GitHubError>> {
+    const path = buildRepositoryPath(input.repository, `actions/jobs/${input.jobId}/logs`);
+    if (!Number.isSafeInteger(input.maxCharacters) || input.maxCharacters <= 0) {
+      return err(createGitHubError({
+        category: 'configuration', operation: 'get_workflow_job_logs', requestLabel: `GET ${path}`,
+        message: 'The workflow log character limit must be a positive integer.'
+      }));
+    }
+    const signal = AbortSignal.timeout(15_000);
+    const result = await requestResponse({
+      operationName: 'get_workflow_job_logs',
+      requestLabel: `GET ${path}`,
+      method: 'GET',
+      path,
+      repository: input.repository,
+      signal
+    }, 'manual');
+    if (!result.ok) return result;
+
+    let response = result.value;
+    try {
+      if (response.status === 302) {
+        const location = response.headers.get('location');
+        await response.body?.cancel();
+        if (location === null) {
+          return err(createGitHubError({
+            category: 'rest', operation: 'get_workflow_job_logs', requestLabel: `GET ${path}`,
+            message: `Job ${input.jobId} log redirect did not provide a download URL.`
+          }));
+        }
+        const downloadUrl = new URL(location);
+        if (downloadUrl.protocol !== 'https:' || downloadUrl.username !== '' || downloadUrl.password !== '') {
+          return err(createGitHubError({
+            category: 'rest', operation: 'get_workflow_job_logs', requestLabel: `GET ${path}`,
+            message: `Job ${input.jobId} returned an invalid log download URL.`
+          }));
+        }
+        // The signed download URL needs no GitHub token. Never forward credentials.
+        response = await fetchFn(downloadUrl, { redirect: 'error', signal });
+      }
+      if (!response.ok) {
+        await response.body?.cancel();
+        return err(createGitHubError({
+          category: 'rest', operation: 'get_workflow_job_logs', requestLabel: `GET ${path}`,
+          status: response.status, message: `Job ${input.jobId} logs could not be downloaded.`
+        }));
+      }
+
+      const reader = response.body?.getReader();
+      if (reader === undefined) return ok({ text: '', truncated: false });
+      const decoder = new TextDecoder();
+      let text = '';
+      let totalCharacters = 0;
+      while (true) {
+        const chunk = await reader.read();
+        const decoded = chunk.done ? decoder.decode() : decoder.decode(chunk.value, { stream: true });
+        totalCharacters += decoded.length;
+        text = (text + decoded).slice(-input.maxCharacters);
+        if (chunk.done) break;
+      }
+      return ok({ text, truncated: totalCharacters > input.maxCharacters });
+    } catch {
+      return err(createGitHubError({
+        category: 'transport', operation: 'get_workflow_job_logs', requestLabel: `GET ${path}`,
+        message: `Job ${input.jobId} log download failed or timed out.`
+      }));
+    }
+  }
+
   return {
     request,
+    getWorkflowJobLogs,
+    listWorkflowRuns(input: GitHubWorkflowRunsRequest) {
+      const params = new URLSearchParams({ head_sha: input.headSha, per_page: '100', page: String(input.page) });
+      const path = buildRepositoryPath(input.repository, `actions/runs?${params}`);
+      return request<GitHubWorkflowRunsResponse>({
+        operationName: 'list_workflow_runs', requestLabel: `GET ${path}`,
+        method: 'GET', path, repository: input.repository
+      });
+    },
+    listWorkflowJobs(input: GitHubWorkflowJobsRequest) {
+      const params = new URLSearchParams({ per_page: '100', page: String(input.page) });
+      const path = buildRepositoryPath(input.repository, `actions/runs/${input.runId}/attempts/${input.attempt}/jobs?${params}`);
+      return request<GitHubWorkflowJobsResponse>({
+        operationName: 'list_workflow_jobs', requestLabel: `GET ${path}`,
+        method: 'GET', path, repository: input.repository
+      });
+    },
     createPullRequest(repository: GitHubRepositoryScope, input: GitHubPullRequestInput) {
       return request<GitHubPullRequestResponse>({
         operationName: 'create_pull_request',
