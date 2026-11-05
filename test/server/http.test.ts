@@ -211,7 +211,7 @@ describe('HTTP MCP server startup', () => {
     }
   });
 
-  describe('role-scoped endpoints', () => {
+  describe('/mcp endpoint', () => {
     async function withServer(run: (baseUrl: string) => Promise<void>) {
       const httpServer = buildHttpServer(new Map<string, McpSession>());
       await new Promise<void>((resolve) => httpServer.listen(0, resolve));
@@ -257,69 +257,84 @@ describe('HTTP MCP server startup', () => {
       return message.result?.tools?.map((tool) => tool.name) ?? [];
     }
 
-    it('lists the builder tools on /mcp/builder', async () => {
+    it('lists exactly the agent tools in registry order on /mcp', async () => {
       await withServer(async (baseUrl) => {
-        const names = await listedToolNames(`${baseUrl}/mcp/builder`);
-        expect(names).toContain('open_pr');
-        expect(names).not.toContain('set_pr_draft');
+        const names = await listedToolNames(`${baseUrl}/mcp`);
+        expect(names).toEqual([
+          'review.get_state',
+          'review.list_actions',
+          'open_pr',
+          'set_pr_draft',
+          'reply_to_thread',
+          'resolve_thread',
+          'request_next_round',
+          'git.push',
+          'git.pull',
+          'git.fetch',
+          'get_review_round',
+          'pr_status',
+          'get_workflow_status'
+        ]);
       });
     });
 
-    it('lists the assessor tools on /mcp/assessor', async () => {
-      await withServer(async (baseUrl) => {
-        const names = await listedToolNames(`${baseUrl}/mcp/assessor`);
-        expect(names).toContain('set_pr_draft');
-        expect(names).not.toContain('open_pr');
-        expect(names).not.toContain('git.push');
-      });
-    });
-
-    it('keeps set_pr_draft off the unscoped /mcp surface', async () => {
+    it('serves set_pr_draft on the unscoped /mcp surface', async () => {
       await withServer(async (baseUrl) => {
         const names = await listedToolNames(`${baseUrl}/mcp`);
         expect(names).toContain('open_pr');
-        expect(names).not.toContain('set_pr_draft');
+        expect(names).toContain('set_pr_draft');
       });
     });
 
-    it('returns 404 for an unknown role', async () => {
+    it('returns 404 for an unknown path', async () => {
       await withServer(async (baseUrl) => {
         const response = await fetch(`${baseUrl}/mcp/operator`, { method: 'POST', headers: MCP_HEADERS, body: initBody });
         expect(response.status).toBe(404);
-        await response.body?.cancel();
+        expect(await response.json()).toEqual({ error: 'Not found' });
       });
     });
 
-    it('does not serve a session on a different surface than it was opened on', async () => {
+    it.each(['/mcp/builder', '/mcp/assessor', '/mcp/', '/mcp?probe=1'])(
+      'returns 404 for %s', async (path) => {
+        await withServer(async (baseUrl) => {
+          const response = await fetch(`${baseUrl}${path}`, {
+            method: 'POST', headers: MCP_HEADERS, body: initBody
+          });
+          expect(response.status).toBe(404);
+          expect(await response.json()).toEqual({ error: 'Not found' });
+        });
+      }
+    );
+
+    it('returns 404 for an unknown session id on /mcp', async () => {
       await withServer(async (baseUrl) => {
-        const headers = await openSession(`${baseUrl}/mcp/assessor`);
-        const response = await fetch(`${baseUrl}/mcp/builder`, {
+        const response = await fetch(`${baseUrl}/mcp`, {
           method: 'POST',
-          headers,
+          headers: { ...MCP_HEADERS, 'mcp-session-id': 'unknown-session' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
         });
         expect(response.status).toBe(404);
-        await response.body?.cancel();
+        expect(await response.json()).toEqual({ error: 'Session not found' });
       });
     });
 
-    it('logs a builder attempt to open a ready pull request as a tool rejection', async () => {
+    it('logs a handler-level rejection on /mcp as a tool rejection', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
         await withServer(async (baseUrl) => {
-          const url = `${baseUrl}/mcp/builder`;
+          const url = `${baseUrl}/mcp`;
           const headers = await openSession(url);
           const message = await rpc(url, headers, 'tools/call', {
-            name: 'open_pr',
-            arguments: { repository: 'openai/gated-review', base: 'main', head: 'feature', title: 'Add feature', draft: false }
+            name: 'review.get_state',
+            arguments: { reviewId: 'review-123' }
           });
 
           expect(message.result?.isError).toBe(true);
           expect(warn).toHaveBeenCalledWith(
             '[gated-review] tool rejection',
             expect.objectContaining({
-              operation: 'open_pr',
-              detail: expect.stringContaining('role=builder')
+              operation: 'review.get_state',
+              detail: 'Tool is not implemented yet.'
             })
           );
         });

@@ -58,10 +58,11 @@ themselves.
 
 ## Draft Status
 
-On the role endpoints, a builder opens pull requests only as drafts and an
-assessor alone can mark one ready for review. Ready-for-review is the assessor's
-signal that the work passed assessment; it is not MergeReady. `merge_pr` still
-enforces only the `merge-ready` label, which remains the operator's.
+`/mcp` serves `set_pr_draft` to change draft state. Draft handling is a
+workflow prompt responsibility, not enforced by the server. `open_pr` opens
+ready for review unless the caller passes `draft: true`.
+Ready-for-review is not MergeReady. `merge_pr` still enforces only the
+`merge-ready` label, which remains the operator's.
 
 ## Server Boundary
 
