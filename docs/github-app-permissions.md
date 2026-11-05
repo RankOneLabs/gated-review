@@ -20,6 +20,8 @@ Install the App on each repository you intend to target, or use an organization-
   - Required for git push, pull, and fetch operations that run through the installation token.
 - `Commit statuses: read`
   - Required for reading the combined status state surfaced by `pr_status`.
+- `Actions: read`
+  - Required by `get_workflow_status` for workflow runs, jobs, and failed-job logs.
 - `Metadata: read`
   - Required for repository introspection.
 

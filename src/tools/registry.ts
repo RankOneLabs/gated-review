@@ -51,6 +51,7 @@ import { createMergePrHandler } from '#root/src/tools/operator/merge-pr.js';
 import type { ToolContract } from '#root/src/tools/types.js';
 import { getPrStatus } from '#root/src/tools/read-model/pr-status.js';
 import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
+import { getWorkflowStatus, workflowStatusInputSchema, workflowStatusOutputSchema } from '#root/src/tools/read-model/workflow-status.js';
 import {
   markMergeReadyInputSchema,
   markMergeReadyOutputSchema,
@@ -237,7 +238,7 @@ export function createToolRegistry(context: ToolExecutionContext) {
       name: 'get_review_round',
       title: 'Review Round',
       description:
-        'Read the current review round for a pull request and return the required triage prompt for grouping comments into fix, discuss, or ignore. Requires repository as an owner/name slug.',
+        'Read all open review threads with their complete comment history; include resolved threads with includeResolved: true. Freshness only annotates threads and never hides previously fetched threads or comments. Returns the required triage prompt for grouping comments into fix, discuss, or ignore. Requires repository as an owner/name slug.',
       actorScopes: ['agent', 'event_source'] as const,
       inputSchemaName: 'get_review_round.input',
       outputSchemaName: 'get_review_round.output',
@@ -255,6 +256,17 @@ export function createToolRegistry(context: ToolExecutionContext) {
       inputSchema: prStatusInputSchema,
       outputSchema: prStatusOutputSchema,
       handler: (input) => getPrStatus(input, context)
+    },
+    {
+      name: 'get_workflow_status',
+      title: 'Workflow Status',
+      description: 'Read the latest GitHub Actions workflow runs for the PR head and test merge commits. Returns status, conclusion, failed jobs, and log tails (up to 20,000 characters per job, 10 job downloads per response), with explicit unavailable and truncated results. Requires repository as an owner/name slug.',
+      actorScopes: ['agent', 'operator', 'event_source'] as const,
+      inputSchemaName: 'get_workflow_status.input',
+      outputSchemaName: 'get_workflow_status.output',
+      inputSchema: workflowStatusInputSchema,
+      outputSchema: workflowStatusOutputSchema,
+      handler: (input) => getWorkflowStatus(input, context)
     }
   ] as const satisfies readonly ToolContract<z.ZodTypeAny, z.ZodTypeAny, string>[];
 }

@@ -1,6 +1,10 @@
 # Freshness Model
 
-`get_review_round` returns only unseen review-thread comments and annotates each returned thread with `hasFreshComments` plus the overall round with a `freshSince` timestamp. This document explains how those results are produced, what guarantees they carry, and what they do not.
+`get_review_round` returns every open review thread with its complete comment history on every call. With `includeResolved: true`, it also returns every resolved thread and its comment history. Freshness annotates results with `hasFreshComments` and `freshSince`; it never filters threads or comments. Fetching feedback does not mean it has been handled.
+
+Thread comments whose author is unavailable are retained with `author: null`,
+matching GitHub's nullable author field. Both the thread list and each thread's
+comments are paginated through all pages.
 
 ## Two Axes
 
@@ -8,15 +12,15 @@ Freshness is built from two independent signals:
 
 ### 1. Unresolved-as-proxy (correctness axis)
 
-A thread is unresolved when GitHub's `isResolved` flag is false. The server counts every unresolved thread on every call regardless of when the comments were posted. This axis is always live — it is derived directly from GitHub's authoritative state and requires no server-side tracking. It is the safety net for `openThreadCount`, even when there are no unseen comments to return.
+A thread is unresolved when GitHub's `isResolved` flag is false. The server returns and counts every unresolved thread on every call regardless of when the comments were posted. This axis is always live — it is derived directly from GitHub's authoritative state and requires no server-side tracking. Resolving a thread is how handled work leaves the default response.
 
 ### 2. `lastDelivered` watermark (ergonomics axis)
 
-The server records the latest `createdAt` timestamp seen across all review-thread comments fetched by a `get_review_round` call. Summary comments (issue comments from CodeRabbit or Copilot) are returned in the response but do not advance the watermark. On subsequent calls for the same PR, each thread's `comments` array is filtered to comments newer than that watermark. Threads with no unseen comments are omitted from `threads`; returned unresolved threads are flagged `hasFreshComments: true`.
+The server records the latest `createdAt` timestamp seen across all review-thread comments fetched by a `get_review_round` call. Summary comments (issue comments from CodeRabbit or Copilot) are returned in the response but do not advance the watermark. An open thread has `hasFreshComments: true` when it contains a comment newer than the prior watermark, or has comments and no valid prior watermark exists. Resolved threads have `hasFreshComments: false`. Older comments remain available as context, and threads with no fresh comments are still returned.
 
-`freshSince` in the `get_review_round` response is the valid watermark value that was in effect when that call was made. It is null on the first call for a PR. If stored freshness state is invalid or unparseable, the server treats it as absent, returns `freshSince: null`, and over-delivers rather than omitting comments.
+`freshSince` in the `get_review_round` response is the valid watermark value used to compute annotations for that call. It is null on the first call for a PR. If stored freshness state is invalid or unparseable, the server treats it as absent and returns `freshSince: null`. This timestamp is an advisory freshness signal, not an acknowledgement or proof that any particular client has seen or handled feedback.
 
-If an individual review comment has an unparseable `createdAt`, the server treats that comment as unseen and fresh. Invalid comment timestamps also do not advance the stored watermark.
+If an individual review comment has an unparseable `createdAt`, the server treats that comment as fresh. Invalid comment timestamps do not advance the stored watermark.
 
 ## Storage: In-Memory, Not Persisted
 
@@ -24,11 +28,11 @@ The watermark store (`FreshnessStore`) is a plain `Map` held in server process m
 
 **Why this is safe:**
 
-- On server restart the map is empty, so every included thread is treated as fresh on the next `get_review_round` call. This over-delivers one round — comments the agent already handled appear again — but it does not under-deliver. The agent re-reads known comments; it does not miss new ones.
-- The unresolved axis is the correctness safety net for counts. Even after restart, unresolved thread count is derived from GitHub directly.
-- A crash-after-fetch scenario (server fetches GitHub, crashes before the agent receives the response) causes the watermark to be unrecorded. The next call returns all currently included thread comments as fresh, which is the conservative outcome.
+- On server restart the map is empty, so open threads with comments are annotated as fresh on the next `get_review_round` call.
+- Threads and comments are always returned independently of the watermark. A lost response or another client's read cannot hide feedback from subsequent reads.
+- Both thread inclusion and `openThreadCount` are derived directly from GitHub.
 
-The trade-off: restart-induced noise (one re-read round per PR) in exchange for zero operational complexity (no database, no volume mount, no migration).
+The trade-off is restart-induced fresh markers in exchange for zero operational complexity (no database, no volume mount, no migration).
 
 ## Lazy Purge on Merge or Close
 
@@ -38,7 +42,7 @@ When `get_review_round` observes that the PR state is `MERGED` or `CLOSED`, it r
 
 There is one watermark cursor per `owner/repo#number` key, shared across all MCP sessions connected to the same server process. If two agents call `get_review_round` for the same PR concurrently, the watermark advances to whichever `createdAt` is largest among both calls. Each agent sees the other's delivered timestamp on subsequent calls.
 
-Per-client cursor isolation is explicitly deferred (see [docs/deferred-items.md](deferred-items.md)). In practice, a single agent operates on a given PR at any one time, so cursor sharing is not a problem in the homelab deployment.
+Per-client cursor isolation is explicitly deferred (see [docs/deferred-items.md](deferred-items.md)). Cursor sharing can affect fresh markers, but cannot affect which threads or comments a client receives. Clients must inspect all open threads even when `hasFreshComments` is false.
 
 ## What `review.*` Stubs Do Not Do
 

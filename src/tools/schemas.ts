@@ -190,7 +190,7 @@ export const readModelThreadCommentSchema = z
     id: z.string().min(1),
     body: z.string(),
     createdAt: z.string().datetime(),
-    author: readModelEntitySchema
+    author: readModelEntitySchema.nullable()
   })
   .strict();
 
@@ -274,7 +274,7 @@ export const getReviewRoundInputSchema = z
   .object({
     repository: repositorySlugSchema,
     pullRequestNumber: z.number().int().positive(),
-    includeResolved: z.boolean().optional()
+    includeResolved: z.boolean().optional().describe('Also return resolved threads with their complete comment history. Previously fetched threads and comments are always returned.')
   })
   .strict()
   .describe('get_review_round.input');

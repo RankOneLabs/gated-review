@@ -182,6 +182,9 @@ function createMockContext(): ToolExecutionContext {
   });
 
   const rest = {
+    listWorkflowRuns: vi.fn(async () => ok({ total_count: 0, workflow_runs: [] })),
+    listWorkflowJobs: vi.fn(async () => ok({ total_count: 0, jobs: [] })),
+    getWorkflowJobLogs: vi.fn(async () => ok({ text: '', truncated: false })),
     createPullRequest: vi.fn(async () =>
       ok({
         number: 17,

@@ -128,7 +128,8 @@ describe('assessor surface', () => {
       'set_pr_draft',
       'git.fetch',
       'get_review_round',
-      'pr_status'
+      'pr_status',
+      'get_workflow_status'
     ]);
   });
 

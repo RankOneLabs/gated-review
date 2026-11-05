@@ -63,6 +63,26 @@ export type GraphQLLabelConnection = Readonly<{
 
 export type GraphQLPrState = 'OPEN' | 'CLOSED' | 'MERGED';
 
+export type GraphQLWorkflowTargetQueryData = Readonly<{
+  repository: Readonly<{
+    pullRequest: Readonly<{
+      headRefOid: string;
+      potentialMergeCommit: Readonly<{ oid: string }> | null;
+    }> | null;
+  }> | null;
+}>;
+
+export const workflowTargetQuery = `
+  query WorkflowTargetQuery($owner: String!, $repo: String!, $number: Int!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        headRefOid
+        potentialMergeCommit { oid }
+      }
+    }
+  }
+`;
+
 export type GraphQLReviewRoundThreadsQueryData = Readonly<{
   repository: Readonly<{
     pullRequest: Readonly<{

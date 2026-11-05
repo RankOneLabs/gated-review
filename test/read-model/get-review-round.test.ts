@@ -1,17 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ok } from '#root/src/result.js';
+import { ok, type Result } from '#root/src/result.js';
 import type { GitHubClient } from '#root/src/github/client.js';
+import type { GitHubGraphQLRequest } from '#root/src/github/graphql.js';
 import { getReviewRound } from '#root/src/tools/read-model/get-review-round.js';
 import {
   reviewRoundSummariesQuery,
   reviewRoundThreadsQuery,
-  reviewThreadCommentsQuery
+  reviewThreadCommentsQuery,
+  type GraphQLPageInfo,
+  type GraphQLReviewRoundThreadsQueryData,
+  type GraphQLReviewRoundSummariesQueryData,
+  type GraphQLReviewThreadCommentsQueryData
 } from '#root/src/tools/read-model/graphql-queries.js';
 import { createInMemoryFreshnessStore, makeRepoPrKey } from '#root/src/tools/freshness-store.js';
 import { expectedTriagePrompt } from '#root/test/fixtures/review-triage-prompt.js';
 
 function makeThreadsResponse(state: 'OPEN' | 'CLOSED' | 'MERGED' = 'OPEN') {
+  const pageInfo: GraphQLPageInfo = { hasNextPage: false, endCursor: null };
   return ok({
     repository: {
       pullRequest: {
@@ -31,10 +37,7 @@ function makeThreadsResponse(state: 'OPEN' | 'CLOSED' | 'MERGED' = 'OPEN') {
               line: null
             }
           ],
-          pageInfo: {
-            hasNextPage: false,
-            endCursor: null
-          }
+          pageInfo
         }
       }
     }
@@ -42,7 +45,9 @@ function makeThreadsResponse(state: 'OPEN' | 'CLOSED' | 'MERGED' = 'OPEN') {
 }
 
 function createGitHubClientMock(prState: 'OPEN' | 'CLOSED' | 'MERGED' = 'OPEN') {
-  const request = vi.fn(async (requestInput: { query: string; variables?: Record<string, unknown> }) => {
+  const request = vi.fn(async (
+    requestInput: Pick<GitHubGraphQLRequest<unknown>, 'query' | 'variables'>
+  ): Promise<Result<GraphQLReviewRoundThreadsQueryData | GraphQLReviewRoundSummariesQueryData | GraphQLReviewThreadCommentsQueryData, never>> => {
     if (requestInput.query === reviewRoundThreadsQuery) {
       return makeThreadsResponse(prState);
     }
@@ -385,7 +390,7 @@ describe('getReviewRound', () => {
     }
   });
 
-  it('advances watermark on fetch and omits stale threads on second call', async () => {
+  it.each([false, true])('keeps complete threads on repeated reads with includeResolved=%s', async (includeResolved) => {
     const { github } = createGitHubClientMock();
     const freshness = createInMemoryFreshnessStore();
 
@@ -395,25 +400,27 @@ describe('getReviewRound', () => {
       freshness
     };
 
-    const first = await getReviewRound({ repository: 'openai/gated-review', pullRequestNumber: 42 }, context);
+    const input = { repository: 'openai/gated-review', pullRequestNumber: 42, includeResolved };
+    const first = await getReviewRound(input, context);
     expect(first.ok).toBe(true);
     if (first.ok) {
       expect(first.value.freshSince).toBeNull();
       expect(first.value.threads[0].hasFreshComments).toBe(true);
     }
 
-    // Second call: watermark now advanced to max comment createdAt ('2026-06-02T12:01:00.000Z').
-    // All existing comments are <= watermark, so the stale thread is omitted.
-    const second = await getReviewRound({ repository: 'openai/gated-review', pullRequestNumber: 42 }, context);
-    expect(second.ok).toBe(true);
-    if (second.ok) {
-      expect(second.value.freshSince).toBe('2026-06-02T12:01:00.000Z');
+    const second = await getReviewRound(input, context);
+    expect(first.ok && second.ok).toBe(true);
+    if (first.ok && second.ok) {
+      expect(second.value.freshSince).toBe(includeResolved ? '2026-06-02T12:02:00.000Z' : '2026-06-02T12:01:00.000Z');
       expect(second.value.openThreadCount).toBe(1);
-      expect(second.value.threads).toEqual([]);
+      expect(second.value.threads).toEqual(first.value.threads.map((thread) => ({
+        ...thread,
+        hasFreshComments: false
+      })));
     }
   });
 
-  it('returns only comments newer than the delivery watermark', async () => {
+  it('keeps older comments as context when a thread has fresh comments', async () => {
     const { github } = createGitHubClientMock();
     const freshness = createInMemoryFreshnessStore();
     const prKey = makeRepoPrKey({ owner: 'openai', repo: 'gated-review' }, 42);
@@ -441,6 +448,15 @@ describe('getReviewRound', () => {
           hasFreshComments: true,
           comments: [
             {
+              id: 'comment-1',
+              body: 'first',
+              createdAt: '2026-06-02T12:00:00.000Z',
+              author: {
+                login: 'alice',
+                kind: 'human'
+              }
+            },
+            {
               id: 'comment-2',
               body: 'second',
               createdAt: '2026-06-02T12:01:00.000Z',
@@ -455,7 +471,171 @@ describe('getReviewRound', () => {
     }
   });
 
-  it('treats an invalid delivery watermark as unseen to avoid under-delivery', async () => {
+  it('returns all comments when resolved threads are requested after an open-only read', async () => {
+    const { github } = createGitHubClientMock();
+    const context = {
+      github,
+      copilotReviewerLogin: 'github-copilot[bot]',
+      freshness: createInMemoryFreshnessStore()
+    };
+    const input = { repository: 'openai/gated-review', pullRequestNumber: 42 };
+
+    await getReviewRound(input, context);
+    const result = await getReviewRound({ ...input, includeResolved: true }, context);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.threads.map((thread) => ({
+        id: thread.id,
+        commentIds: thread.comments.map((comment) => comment.id)
+      }))).toEqual([
+        { id: 'thread-open', commentIds: ['comment-1', 'comment-2'] },
+        { id: 'thread-resolved', commentIds: ['comment-3'] }
+      ]);
+    }
+  });
+
+  it('returns threads even when another client has advanced the shared watermark past them', async () => {
+    const { github } = createGitHubClientMock();
+    const freshness = createInMemoryFreshnessStore();
+    freshness.record(makeRepoPrKey({ owner: 'openai', repo: 'gated-review' }, 42), '2026-06-02T12:10:00.000Z');
+
+    const result = await getReviewRound(
+      { repository: 'openai/gated-review', pullRequestNumber: 42, includeResolved: true },
+      { github, copilotReviewerLogin: 'github-copilot[bot]', freshness }
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.threads.map((thread) => ({
+        id: thread.id,
+        hasFreshComments: thread.hasFreshComments,
+        commentIds: thread.comments.map((comment) => comment.id)
+      }))).toEqual([
+        { id: 'thread-open', hasFreshComments: false, commentIds: ['comment-1', 'comment-2'] },
+        { id: 'thread-resolved', hasFreshComments: false, commentIds: ['comment-3'] }
+      ]);
+    }
+  });
+
+  it('keeps threads from every page on repeated reads', async () => {
+    const { github, request } = createGitHubClientMock();
+    const originalRequest = request.getMockImplementation();
+    if (!originalRequest) throw new Error('Missing mock implementation');
+    request.mockImplementation(async (input) => {
+      if (input.query !== reviewRoundThreadsQuery) return originalRequest(input);
+
+      const response = makeThreadsResponse();
+      if (!response.ok) return response;
+      const pullRequest = response.value.repository.pullRequest;
+      const isFirstPage = input.variables?.after === null;
+      return ok({
+        repository: {
+          pullRequest: {
+            ...pullRequest,
+            reviewThreads: {
+              nodes: isFirstPage ? pullRequest.reviewThreads.nodes.slice(0, 1) : pullRequest.reviewThreads.nodes.slice(1),
+              pageInfo: {
+                hasNextPage: isFirstPage,
+                endCursor: isFirstPage ? 'threads-page-2' : null
+              }
+            }
+          }
+        }
+      });
+    });
+    const input = { repository: 'openai/gated-review', pullRequestNumber: 42, includeResolved: true };
+    const context = {
+      github,
+      copilotReviewerLogin: 'github-copilot[bot]',
+      freshness: createInMemoryFreshnessStore()
+    };
+
+    await getReviewRound(input, context);
+    const result = await getReviewRound(input, context);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.threads.map((thread) => ({
+        id: thread.id,
+        commentIds: thread.comments.map((comment) => comment.id)
+      }))).toEqual([
+        { id: 'thread-open', commentIds: ['comment-1', 'comment-2'] },
+        { id: 'thread-resolved', commentIds: ['comment-3'] }
+      ]);
+    }
+  });
+
+  it('keeps thread metadata when GitHub returns no comments', async () => {
+    const { github, request } = createGitHubClientMock();
+    const originalRequest = request.getMockImplementation();
+    if (!originalRequest) throw new Error('Missing mock implementation');
+    request.mockImplementation(async (input) => {
+      if (input.query !== reviewThreadCommentsQuery) return originalRequest(input);
+      return ok({
+        node: {
+          comments: {
+            nodes: [],
+            pageInfo: { hasNextPage: false, endCursor: null }
+          }
+        }
+      });
+    });
+
+    const result = await getReviewRound(
+      { repository: 'openai/gated-review', pullRequestNumber: 42 },
+      { github, copilotReviewerLogin: 'github-copilot[bot]', freshness: createInMemoryFreshnessStore() }
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.threads).toEqual([{
+        id: 'thread-open',
+        state: 'open',
+        path: 'src/open.ts',
+        line: 12,
+        hasFreshComments: false,
+        comments: []
+      }]);
+    }
+  });
+
+  it('keeps every comment in a resolved thread when an author is missing', async () => {
+    const { github, request } = createGitHubClientMock();
+    const originalRequest = request.getMockImplementation();
+    if (!originalRequest) throw new Error('Missing mock implementation');
+    request.mockImplementation(async (input) => {
+      if (input.query !== reviewThreadCommentsQuery || input.variables?.id !== 'thread-resolved') {
+        return originalRequest(input);
+      }
+      return ok({
+        node: {
+          comments: {
+            nodes: [
+              { id: 'deleted-author-comment', body: 'feedback from a deleted account', createdAt: '2026-06-02T12:02:00.000Z', author: null },
+              { id: 'reply', body: 'a reply', createdAt: '2026-06-02T12:03:00.000Z', author: { login: 'carol' } }
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null }
+          }
+        }
+      });
+    });
+
+    const result = await getReviewRound(
+      { repository: 'openai/gated-review', pullRequestNumber: 42, includeResolved: true },
+      { github, copilotReviewerLogin: 'github-copilot[bot]' }
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.threads.find((thread) => thread.id === 'thread-resolved')?.comments).toEqual([
+        { id: 'deleted-author-comment', body: 'feedback from a deleted account', createdAt: '2026-06-02T12:02:00.000Z', author: null },
+        { id: 'reply', body: 'a reply', createdAt: '2026-06-02T12:03:00.000Z', author: { login: 'carol', kind: 'human' } }
+      ]);
+    }
+  });
+
+  it('treats an invalid delivery watermark as absent when annotating freshness', async () => {
     const { github } = createGitHubClientMock();
 
     const result = await getReviewRound(
@@ -480,7 +660,7 @@ describe('getReviewRound', () => {
     }
   });
 
-  it('treats invalid comment timestamps as unseen and fresh', async () => {
+  it('treats invalid comment timestamps as fresh', async () => {
     const { github } = createGitHubClientMockWithInvalidCommentTimestamp();
     const freshness = createInMemoryFreshnessStore();
     const prKey = makeRepoPrKey({ owner: 'openai', repo: 'gated-review' }, 42);

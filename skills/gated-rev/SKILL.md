@@ -42,14 +42,23 @@ requests a re-triage — "once" does not mean "never again".
 The response envelope contains:
 - `threads` — review threads, each with `state` (open/resolved), `path` (nullable),
   `line` (nullable), `hasFreshComments`, and `comments` (array with `author.kind`,
-  `author.login`, `body`, `createdAt`). After the first fetch, stale threads are
-  omitted and each returned `comments` array contains only unseen comments.
+  `author.login`, `body`, `createdAt`). Every call returns all open threads and
+  their complete comment history. Set `includeResolved: true` to also return
+  resolved threads and their comment history. Freshness never hides feedback.
+  A comment's `author` may be null; retain the comment and display its author as
+  unavailable.
 - `openThreadCount` — total unresolved threads
-- `freshSince` — watermark timestamp; returned comments arrived after this watermark
+- `freshSince` — shared watermark timestamp used only to compute fresh markers
 - `summaries` — top-level summary comments from CodeRabbit or Copilot
 
-Focus triage on open threads (`state: "open"`). Returned open threads are new work.
-If `freshSince` is null, all included threads are new.
+Triage every open thread (`state: "open"`), including those with
+`hasFreshComments: false`. Fresh markers are advisory and shared across clients;
+they do not prove that this agent has seen or handled a thread.
+
+Use the separate `get_workflow_status { repository: REPO, pullRequestNumber: PR }`
+tool for current workflow status and failed-job logs. Report unavailable job
+lists or logs explicitly, and check truncation markers before treating log text
+as complete. Workflow results are advisory context for triage.
 
 ## Evaluate
 
@@ -105,8 +114,8 @@ Apply only what the operator has approved. Follow resolve-discipline exactly:
 ### Resolve-discipline
 
 Unresolved threads are the agent inbox. Resolving is how a handled thread leaves it.
-The freshness watermark is derived from unresolved threads — resolving too early or too
-late corrupts the "what's new" signal.
+The freshness watermark only annotates comments fetched by the server. Reading a
+thread never removes it from the inbox or acknowledges that it was handled.
 
 **Fix path:** make the code change → call `git.push { repository: REPO, repo_path: <local-repo-path>, branch: <branch> }` →
 call `resolve_thread { repository: REPO, threadId }`. Resolve only after the push
